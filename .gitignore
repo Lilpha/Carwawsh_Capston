@@ -1,0 +1,14 @@
+# Dependency folders
+node_modules/
+
+# Build folders
+frontend/android/build/
+frontend/ios/build/
+frontend/vendor/
+
+# OS files
+.DS_Store
+
+# Sensitive files
+.env
+google-services.json
