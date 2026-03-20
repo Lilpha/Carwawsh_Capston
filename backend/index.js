@@ -41,3 +41,24 @@ const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`🚀 서버 가동 중: http://localhost:${PORT}`);
 });
+
+// [Step 3] 모든 세차장 목록을 가져오는 API
+app.get('/api/washes', async (req, res) => {
+  try {
+    const query = 'SELECT * FROM gas_station_washes ORDER BY id ASC';
+    const { rows } = await pool.query(query);
+    
+    // 좌표 데이터를 숫자로 변환 (DB에서 문자열로 넘어올 수 있음)
+    const washes = rows.map(row => ({
+      ...row,
+      latitude: parseFloat(row.latitude),
+      longitude: parseFloat(row.longitude)
+    }));
+
+    console.log(`✅ ${washes.length}개의 세차장 데이터를 전송했습니다.`);
+    res.json(washes);
+  } catch (err) {
+    console.error('❌ API 에러:', err);
+    res.status(500).json({ error: '데이터 로딩 실패' });
+  }
+});
