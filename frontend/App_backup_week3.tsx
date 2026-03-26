@@ -2,60 +2,38 @@ import React, { useState, useEffect } from 'react';
 import { 
   SafeAreaView, StyleSheet, TextInput, TouchableOpacity, Text, View, Alert, ActivityIndicator 
 } from 'react-native';
+import auth from '@react-native-firebase/auth';
 import { Picker } from '@react-native-picker/picker';
 import MapView, { Marker, Callout } from 'react-native-maps';
-// 우리가 만든 Supabase 설정 파일을 가져옵니다.
-import { supabase } from './src/lib/supabase';
-
-// [TypeScript] 세차장 데이터의 '신분증' 같은 규격을 정의합니다.
-interface Wash {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-  address: string;
-}
 
 const App = () => {
-  // --- [상태 관리] ---
-  const [currentScreen, setCurrentScreen] = useState('LOGIN'); // 현재 화면 (로그인/회원가입/지도)
-  const [loading, setLoading] = useState(false);               // 로딩 애니메이션 상태
-  const [washes, setWashes] = useState<Wash[]>([]);            // 지도에 뿌릴 세차장 리스트
+  const [currentScreen, setCurrentScreen] = useState('LOGIN'); // LOGIN, SIGNUP, MAP
+  const [loading, setLoading] = useState(false);
+  const [washes, setWashes] = useState([]);
   
-  const [email, setEmail] = useState('');                      // 이메일 입력값
-  const [password, setPassword] = useState('');                // 비밀번호 입력값
-  const [carNumber, setCarNumber] = useState('');              // 차량 번호
-  const [carType, setCarType] = useState('승용');               // 차량 종류 (기본값: 승용)
+  // 가입/로그인용 공통 상태
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [carNumber, setCarNumber] = useState('');
+  const [carType, setCarType] = useState('승용');
 
-  // --- [데이터 로드] ---
-  // Supabase의 'shops' 테이블에서 모든 세차장 정보를 가져옵니다.
+  // 세차장 데이터 로드 함수
   const loadWashes = async () => {
     try {
-      const { data, error } = await supabase
-        .from('shops')
-        .select('*'); 
-
-      if (error) throw error;
-      setWashes(data || []); // 받아온 데이터를 상태에 저장
-    } catch (e: any) {
-      console.error('데이터 로딩 에러:', e.message);
+      const response = await fetch('http://10.0.2.2:3000/api/washes');
+      const data = await response.json();
+      setWashes(data);
+    } catch (e) {
+      console.error('데이터 로딩 에러:', e);
     }
   };
 
-  // --- [로그인 로직] ---
+  // --- 1. 로그인 로직 ---
   const handleLogin = async () => {
     if (!email || !password) return Alert.alert('알림', '정보를 입력해주세요.');
     setLoading(true);
     try {
-      // Supabase Auth 서버에 이메일/비번 확인 요청
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      // 로그인 성공 시 세차장 데이터를 미리 불러오고 지도 화면으로 이동
+      await auth().signInWithEmailAndPassword(email, password);
       await loadWashes();
       setCurrentScreen('MAP');
     } catch (e: any) {
@@ -63,28 +41,17 @@ const App = () => {
     } finally { setLoading(false); }
   };
 
-  // --- [회원가입 로직] ---
+  // --- 2. 회원가입 로직 ---
   const handleSignUp = async () => {
     if (!email || !password || !carNumber) return Alert.alert('알림', '모든 정보를 입력해주세요.');
     setLoading(true);
     try {
-      // 1. 계정 생성: Supabase 인증 서버에 유저 계정을 만듭니다.
-      // -> 이 순간 DB 트리거가 발동하여 public.users 테이블에 기본 정보를 자동 생성합니다!
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
+      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+      await fetch('http://10.0.2.2:3000/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: userCredential.user.uid, email, carNumber, carType }),
       });
-
-      if (signUpError) throw signUpError;
-
-      // 2. 추가 정보 입력: 트리거가 이미 만든 행(row)을 찾아서 차량 번호와 차종을 업데이트합니다.
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ car_number: carNumber, car_type: carType })
-        .eq('id', data.user?.id); // 가입된 유저의 고유 ID와 일치하는 행을 찾음
-
-      if (updateError) throw updateError;
-
       Alert.alert('성공', '회원가입 완료! 로그인을 진행해주세요.');
       setCurrentScreen('LOGIN');
     } catch (e: any) {
@@ -92,13 +59,7 @@ const App = () => {
     } finally { setLoading(false); }
   };
 
-  // --- [로그아웃 로직] ---
-  const handleLogout = async () => {
-    await supabase.auth.signOut(); // 서버 세션 종료
-    setCurrentScreen('LOGIN');     // 로그인 화면으로 튕겨냄
-  };
-
-  // --- [UI 렌더링 영역] ---
+  // --- 화면 분기 렌더링 ---
 
   // [A] 로그인 화면
   if (currentScreen === 'LOGIN') {
@@ -146,18 +107,17 @@ const App = () => {
     );
   }
 
-  // [C] 지도 화면 (최종 결과물)
+  // [C] 지도 화면 (Step 3 결과물)
   return (
     <View style={styles.mapContainer}>
       <MapView
         style={styles.map}
         initialRegion={{
-          latitude: 37.8813, longitude: 127.7298, // 춘천시청 기준
+          latitude: 37.8813, longitude: 127.7298,
           latitudeDelta: 0.08, longitudeDelta: 0.08,
         }}
       >
-        {/* 불러온 세차장 배열을 마커로 표시 */}
-        {washes.map((wash: Wash) => (
+        {washes.map((wash: any) => (
           <Marker key={wash.id} coordinate={{ latitude: wash.latitude, longitude: wash.longitude }}>
             <Callout>
               <View style={{ padding: 5 }}>
@@ -168,9 +128,7 @@ const App = () => {
           </Marker>
         ))}
       </MapView>
-      
-      {/* 로그아웃 버튼 */}
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+      <TouchableOpacity style={styles.logoutBtn} onPress={() => { auth().signOut(); setCurrentScreen('LOGIN'); }}>
         <Text style={{ color: 'white', fontWeight: 'bold' }}>로그아웃</Text>
       </TouchableOpacity>
     </View>
