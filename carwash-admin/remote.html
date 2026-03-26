@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
+    <title>CarWash Admin — 영업 리모컨</title>
+    <meta name="theme-color" content="#5a58e9" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CarWash Remote" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              primary: '#5a58e9',
+              'background-light': '#f6f6f8',
+              'background-dark': '#111121',
+              success: '#00D68F',
+              danger: '#FF3D71',
+              warning: '#FFB11B',
+              'orange-accent': '#FF7043',
+            },
+            fontFamily: {
+              display: ['Inter', 'sans-serif'],
+            },
+            borderRadius: { DEFAULT: '0.25rem', lg: '0.5rem', xl: '0.75rem', full: '9999px' },
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        min-height: max(884px, 100dvh);
+      }
+      .huge-toggle-shadow {
+        box-shadow:
+          0 10px 25px -5px rgba(0, 0, 0, 0.1),
+          0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      }
+      /* 캡처처럼 바깥은 어두운 배경 + 도트 */
+      .remote-page-bg {
+        background-color: #111121;
+        background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
+      /* iOS safe-area 대응 */
+      .safe-top {
+        padding-top: env(safe-area-inset-top);
+      }
+      .safe-bottom {
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      .toast {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(16px + env(safe-area-inset-bottom));
+        z-index: 9999;
+        max-width: min(520px, calc(100vw - 32px));
+      }
+      .toast-hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-50%) translateY(10px);
+      }
+      .toast-visible {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateX(-50%) translateY(0);
+      }
+    </style>
+  </head>
+  <body class="remote-page-bg font-display overscroll-none">
+    <div class="flex flex-col min-h-screen max-w-md mx-auto bg-white dark:bg-slate-950 shadow-2xl relative overflow-hidden text-slate-900 dark:text-slate-100 safe-top safe-bottom">
+      <div class="absolute top-0 left-0 right-0 h-1 bg-primary z-10"></div>
+
+      <!-- Header -->
+      <header class="flex items-center justify-between px-6 py-6 bg-white dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800">
+        <h1 class="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white pr-2">Sparkle Shine Auto Spa</h1>
+        <a
+          href="dashboard.html"
+          class="w-12 h-12 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+          aria-label="대시보드로"
+        >
+          <span class="material-symbols-outlined text-slate-600 dark:text-slate-400 text-3xl">settings</span>
+        </a>
+      </header>
+
+      <!-- Main: Remote Control -->
+      <main class="flex-1 p-6 space-y-8 pb-32">
+        <!-- Store Selector + Status -->
+        <section class="space-y-3">
+          <div class="flex items-end justify-between gap-3">
+            <div class="min-w-0">
+              <h2 class="text-lg font-bold text-slate-500 dark:text-slate-400 ml-1">지점 선택</h2>
+              <p class="text-xs text-slate-400 dark:text-slate-500 ml-1 mt-1">중안 목업 · 변경 시 API로 저장되는 형태</p>
+            </div>
+            <div class="text-right shrink-0">
+              <p class="text-[11px] text-slate-400 dark:text-slate-500 font-semibold">마지막 저장</p>
+              <p class="text-xs font-extrabold text-slate-700 dark:text-slate-200" id="last-saved">—</p>
+            </div>
+          </div>
+          <div class="relative">
+            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">storefront</span>
+            <select
+              id="store-select"
+              class="w-full h-14 pl-12 pr-10 bg-slate-100 dark:bg-slate-900 border-none rounded-2xl focus:ring-4 focus:ring-primary/30 text-base font-bold"
+            >
+              <option value="store_gangnam" selected>강남점 · Sparkle Shine Auto Spa</option>
+              <option value="store_yeoksam">역삼점 · BubbleSign Auto</option>
+              <option value="store_jamsil">잠실점 · Aqua Shine Pro</option>
+            </select>
+            <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
+          </div>
+        </section>
+
+        <section class="space-y-4">
+          <h2 class="text-lg font-bold text-slate-500 dark:text-slate-400 ml-1">영업 상태</h2>
+          <div class="grid grid-cols-2 gap-4 h-32">
+            <label class="relative flex cursor-pointer group">
+              <input checked class="peer sr-only" name="status" type="radio" value="open" />
+              <div
+                class="w-full h-full flex flex-col items-center justify-center rounded-2xl border-4 border-transparent bg-slate-100 dark:bg-slate-900 peer-checked:bg-success peer-checked:text-white transition-all duration-200 huge-toggle-shadow"
+              >
+                <span class="material-symbols-outlined text-4xl mb-1">check_circle</span>
+                <span class="text-xl font-black">Open</span>
+              </div>
+            </label>
+            <label class="relative flex cursor-pointer group">
+              <input class="peer sr-only" name="status" type="radio" value="closed" />
+              <div
+                class="w-full h-full flex flex-col items-center justify-center rounded-2xl border-4 border-transparent bg-slate-100 dark:bg-slate-900 peer-checked:bg-danger peer-checked:text-white transition-all duration-200 huge-toggle-shadow"
+              >
+                <span class="material-symbols-outlined text-4xl mb-1">cancel</span>
+                <span class="text-xl font-black">Closed</span>
+              </div>
+            </label>
+          </div>
+        </section>
+
+        <section class="space-y-4">
+          <h2 class="text-lg font-bold text-slate-500 dark:text-slate-400 ml-1">겨울철 모드</h2>
+          <div class="grid grid-cols-2 gap-4 h-32">
+            <label class="relative flex cursor-pointer group">
+              <input checked class="peer sr-only" name="winter" type="radio" value="hot" />
+              <div
+                class="w-full h-full flex flex-col items-center justify-center rounded-2xl border-4 border-transparent bg-slate-100 dark:bg-slate-900 peer-checked:bg-primary peer-checked:text-white transition-all duration-200 huge-toggle-shadow"
+              >
+                <span class="material-symbols-outlined text-4xl mb-1">hot_tub</span>
+                <span class="text-base font-black leading-tight text-center">Hot Water<br />ON</span>
+              </div>
+            </label>
+            <label class="relative flex cursor-pointer group">
+              <input class="peer sr-only" name="winter" type="radio" value="frozen" />
+              <div
+                class="w-full h-full flex flex-col items-center justify-center rounded-2xl border-4 border-transparent bg-slate-100 dark:bg-slate-900 peer-checked:bg-danger peer-checked:text-white transition-all duration-200 huge-toggle-shadow"
+              >
+                <span class="material-symbols-outlined text-4xl mb-1">ac_unit</span>
+                <span class="text-base font-black leading-tight text-center">Frozen<br />Alert</span>
+              </div>
+            </label>
+          </div>
+        </section>
+
+        <section class="space-y-4">
+          <h2 class="text-lg font-bold text-slate-500 dark:text-slate-400 ml-1">혼잡도 설정</h2>
+          <div class="grid grid-cols-3 gap-3 h-40">
+            <label class="relative flex cursor-pointer group">
+              <input checked class="peer sr-only" name="traffic" type="radio" value="clear" />
+              <div
+                class="w-full h-full flex flex-col items-center justify-center rounded-2xl border-4 border-transparent bg-slate-100 dark:bg-slate-900 peer-checked:bg-success peer-checked:text-white transition-all duration-200 huge-toggle-shadow"
+              >
+                <span class="material-symbols-outlined text-3xl mb-2">speed</span>
+                <span class="text-lg font-black">Clear</span>
+              </div>
+            </label>
+            <label class="relative flex cursor-pointer group">
+              <input class="peer sr-only" name="traffic" type="radio" value="normal" />
+              <div
+                class="w-full h-full flex flex-col items-center justify-center rounded-2xl border-4 border-transparent bg-slate-100 dark:bg-slate-900 peer-checked:bg-warning peer-checked:text-white transition-all duration-200 huge-toggle-shadow"
+              >
+                <span class="material-symbols-outlined text-3xl mb-2">traffic</span>
+                <span class="text-lg font-black">Normal</span>
+              </div>
+            </label>
+            <label class="relative flex cursor-pointer group">
+              <input class="peer sr-only" name="traffic" type="radio" value="busy" />
+              <div
+                class="w-full h-full flex flex-col items-center justify-center rounded-2xl border-4 border-transparent bg-slate-100 dark:bg-slate-900 peer-checked:bg-orange-accent peer-checked:text-white transition-all duration-200 huge-toggle-shadow"
+              >
+                <span class="material-symbols-outlined text-3xl mb-2">grid_view</span>
+                <span class="text-lg font-black">Busy</span>
+              </div>
+            </label>
+          </div>
+        </section>
+
+        <section class="space-y-4">
+          <h2 class="text-lg font-bold text-slate-500 dark:text-slate-400 ml-1">공지사항 작성</h2>
+          <div class="relative">
+            <input
+              id="announcement"
+              class="w-full h-16 pl-6 pr-[5.5rem] bg-slate-100 dark:bg-slate-900 border-none rounded-2xl focus:ring-4 focus:ring-primary/30 text-lg font-medium placeholder:text-slate-400"
+              placeholder="예: 오늘 영하 10도로 인해 조기 마감합니다"
+              type="text"
+            />
+            <button
+              type="button"
+              id="save-announcement"
+              class="absolute right-3 top-3 bottom-3 bg-primary text-white px-4 rounded-xl font-bold hover:bg-primary/90 transition-colors"
+            >
+              저장
+            </button>
+          </div>
+        </section>
+
+        <!-- API Payload Preview (for backend integration) -->
+        <section class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-slate-500 dark:text-slate-400 ml-1">API Payload 미리보기</h2>
+            <button
+              type="button"
+              id="copy-payload"
+              class="text-sm font-extrabold text-primary hover:underline"
+              aria-label="payload 복사"
+            >
+              복사
+            </button>
+          </div>
+          <pre
+            id="payload-preview"
+            class="w-full bg-slate-100 dark:bg-slate-900 rounded-2xl p-4 text-[12px] leading-5 overflow-auto border border-slate-200/60 dark:border-slate-800"
+          >{}</pre>
+          <p class="text-xs text-slate-400 dark:text-slate-500 ml-1">
+            실제 연동 시에는 아래 JSON을 그대로 서버에 <span class="font-bold">PATCH</span>로 보내는 형태로 연결합니다.
+          </p>
+        </section>
+      </main>
+
+      <footer class="absolute bottom-0 left-0 right-0 p-6 bg-white dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 safe-bottom">
+        <a
+          href="index.html"
+          class="w-full h-14 flex items-center justify-center gap-2 rounded-2xl border-2 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+        >
+          <span class="material-symbols-outlined">logout</span>
+          <span>로그아웃</span>
+        </a>
+      </footer>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast toast-hidden transition-all duration-200">
+      <div class="bg-slate-900/95 text-white rounded-2xl px-4 py-3 shadow-xl flex items-center gap-2">
+        <span class="material-symbols-outlined text-[20px]" id="toast-icon">check_circle</span>
+        <div class="min-w-0">
+          <p class="text-sm font-extrabold leading-5" id="toast-title">저장됨</p>
+          <p class="text-xs text-white/75 truncate" id="toast-subtitle">변경 사항이 반영되었습니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var toastTimer = null;
+
+        function formatTime(d) {
+          try {
+            return (
+              d.getFullYear() +
+              '.' +
+              String(d.getMonth() + 1).padStart(2, '0') +
+              '.' +
+              String(d.getDate()).padStart(2, '0') +
+              ' ' +
+              String(d.getHours()).padStart(2, '0') +
+              ':' +
+              String(d.getMinutes()).padStart(2, '0') +
+              ':' +
+              String(d.getSeconds()).padStart(2, '0')
+            );
+          } catch (e) {
+            return '—';
+          }
+        }
+
+        function getSelectedValue(name) {
+          var el = document.querySelector('input[name=\"' + name + '\"]:checked');
+          return el ? el.value : null;
+        }
+
+        function buildPayload() {
+          var storeSelect = document.getElementById('store-select');
+          var storeId = storeSelect && storeSelect.value ? storeSelect.value : 'store_gangnam';
+          var announcement = document.getElementById('announcement');
+          var payload = {
+            storeId: storeId,
+            status: getSelectedValue('status'), // open | closed
+            winterMode: getSelectedValue('winter'), // hot | frozen
+            congestion: getSelectedValue('traffic'), // clear | normal | busy
+            announcement: announcement ? announcement.value.trim() : '',
+            updatedAt: new Date().toISOString(),
+          };
+          return payload;
+        }
+
+        function renderPayload(payload) {
+          var pre = document.getElementById('payload-preview');
+          if (!pre) return;
+          pre.textContent = JSON.stringify(payload, null, 2);
+        }
+
+        function showToast(opts) {
+          var toast = document.getElementById('toast');
+          if (!toast) return;
+          var title = document.getElementById('toast-title');
+          var sub = document.getElementById('toast-subtitle');
+          var icon = document.getElementById('toast-icon');
+
+          if (title) title.textContent = (opts && opts.title) || '저장됨';
+          if (sub) sub.textContent = (opts && opts.subtitle) || '변경 사항이 반영되었습니다.';
+          if (icon) icon.textContent = (opts && opts.icon) || 'check_circle';
+
+          toast.classList.remove('toast-hidden');
+          toast.classList.add('toast-visible');
+          if (toastTimer) clearTimeout(toastTimer);
+          toastTimer = setTimeout(function () {
+            toast.classList.remove('toast-visible');
+            toast.classList.add('toast-hidden');
+          }, 1400);
+        }
+
+        // ---- Mock API layer (replace with real fetch later) ----
+        function mockPatchStoreSettings(payload) {
+          // 실제 연동 형태 예시:
+          // return fetch(`/api/admin/stores/${payload.storeId}/settings`, {
+          //   method: 'PATCH',
+          //   headers: { 'Content-Type': 'application/json', Authorization: 'Bearer <token>' },
+          //   body: JSON.stringify(payload),
+          // });
+          return new Promise(function (resolve) {
+            setTimeout(function () {
+              resolve({ ok: true });
+            }, 220);
+          });
+        }
+
+        function save(reason) {
+          var payload = buildPayload();
+          renderPayload(payload);
+
+          return mockPatchStoreSettings(payload)
+            .then(function (res) {
+              if (!res || !res.ok) throw new Error('save failed');
+              var now = new Date();
+              var last = document.getElementById('last-saved');
+              if (last) last.textContent = formatTime(now);
+              showToast({
+                title: '저장됨',
+                subtitle: reason || '변경 사항이 반영되었습니다.',
+                icon: 'check_circle',
+              });
+            })
+            .catch(function () {
+              showToast({
+                title: '저장 실패',
+                subtitle: '네트워크 오류(목업). 다시 시도해 주세요.',
+                icon: 'error',
+              });
+            });
+        }
+
+        function init() {
+          // 최초 렌더
+          renderPayload(buildPayload());
+
+          // 라디오/셀렉트 변경 시 즉시 저장(운영툴 느낌)
+          ['status', 'winter', 'traffic'].forEach(function (name) {
+            document.querySelectorAll('input[name=\"' + name + '\"]').forEach(function (el) {
+              el.addEventListener('change', function () {
+                save('토글 변경 저장');
+              });
+            });
+          });
+
+          var store = document.getElementById('store-select');
+          if (store) {
+            store.addEventListener('change', function () {
+              renderPayload(buildPayload());
+              showToast({ title: '지점 변경', subtitle: '선택한 지점 기준으로 제어합니다.', icon: 'storefront' });
+            });
+          }
+
+          // 공지 저장 버튼
+          var btn = document.getElementById('save-announcement');
+          var input = document.getElementById('announcement');
+          if (btn && input) {
+            btn.addEventListener('click', function () {
+              var v = input.value.trim();
+              if (!v) {
+                showToast({ title: '안내', subtitle: '공지 내용을 입력해 주세요.', icon: 'info' });
+                return;
+              }
+              save('공지 저장');
+            });
+          }
+
+          // payload 복사
+          var copyBtn = document.getElementById('copy-payload');
+          if (copyBtn) {
+            copyBtn.addEventListener('click', function () {
+              var text = JSON.stringify(buildPayload(), null, 2);
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard
+                  .writeText(text)
+                  .then(function () {
+                    showToast({ title: '복사됨', subtitle: 'payload가 클립보드에 복사되었습니다.', icon: 'content_copy' });
+                  })
+                  .catch(function () {
+                    showToast({ title: '복사 실패', subtitle: '브라우저 권한을 확인해 주세요.', icon: 'error' });
+                  });
+              } else {
+                showToast({ title: '복사 불가', subtitle: '이 브라우저는 클립보드를 지원하지 않습니다.', icon: 'warning' });
+              }
+            });
+          }
+        }
+
+        init();
+
+        // PWA용 서비스 워커 (https 환경에서 효과적)
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('./sw.js').catch(function () {});
+        }
+      })();
+    </script>
+  </body>
+</html>
