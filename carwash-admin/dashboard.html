@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
+    <title>CarWash Admin — 대시보드</title>
+    <meta name="theme-color" content="#5a58e9" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CarWash Admin" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              primary: '#5a58e9',
+              'background-light': '#f6f6f8',
+              'background-dark': '#111121',
+            },
+            fontFamily: {
+              display: ['Inter', 'sans-serif'],
+            },
+            borderRadius: { DEFAULT: '0.25rem', lg: '0.5rem', xl: '0.75rem', full: '9999px' },
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        min-height: 100dvh;
+      }
+    </style>
+  </head>
+  <body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100">
+    <div class="fixed top-0 left-0 w-full h-1 bg-primary z-50"></div>
+
+    <div class="min-h-screen flex">
+      <!-- Sidebar -->
+      <aside class="hidden md:flex w-64 flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+        <div class="h-16 flex items-center gap-2 px-5 border-b border-slate-200 dark:border-slate-800">
+          <div class="w-9 h-9 bg-primary rounded-lg flex items-center justify-center shadow-md shadow-primary/20">
+            <span class="material-symbols-outlined text-white text-[22px]">local_car_wash</span>
+          </div>
+          <span class="font-bold text-lg tracking-tight">CarWash Admin</span>
+        </div>
+        <nav class="p-3 space-y-1 flex-1">
+          <a
+            href="#"
+            class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/10 text-primary font-semibold text-sm"
+          >
+            <span class="material-symbols-outlined text-[22px]">dashboard</span>
+            대시보드
+          </a>
+          <a
+            href="remote.html"
+            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium"
+          >
+            <span class="material-symbols-outlined text-[22px]">touch_app</span>
+            영업 리모컨
+          </a>
+          <a
+            href="#"
+            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium"
+          >
+            <span class="material-symbols-outlined text-[22px]">storefront</span>
+            세차장 관리
+          </a>
+          <a
+            href="#"
+            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium"
+          >
+            <span class="material-symbols-outlined text-[22px]">schedule</span>
+            예약 · 이용 내역
+          </a>
+          <a
+            href="#"
+            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium"
+          >
+            <span class="material-symbols-outlined text-[22px]">settings</span>
+            설정
+          </a>
+        </nav>
+        <div class="p-4 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500">
+          중안용 목업 · 실제 API 연동 전
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <div class="flex-1 flex flex-col min-w-0">
+        <header
+          class="h-16 flex items-center justify-between px-4 md:px-8 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-40"
+        >
+          <div class="flex items-center gap-3">
+            <button type="button" class="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="메뉴">
+              <span class="material-symbols-outlined">menu</span>
+            </button>
+            <h1 class="text-lg font-bold tracking-tight">대시보드</h1>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-slate-500 dark:text-slate-400 hidden sm:inline" id="welcome-msg">관리자</span>
+            <a
+              href="index.html"
+              class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <span class="material-symbols-outlined text-[20px]">logout</span>
+              로그아웃
+            </a>
+          </div>
+        </header>
+
+        <main class="flex-1 p-4 md:p-8 overflow-auto">
+          <p class="text-slate-500 dark:text-slate-400 text-sm mb-6">오늘의 운영 현황을 한눈에 확인하세요.</p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">영업 중 세차장</span>
+                <span class="material-symbols-outlined text-primary text-2xl">storefront</span>
+              </div>
+              <p class="text-3xl font-bold tracking-tight">12</p>
+              <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">전일 대비 +2</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">대기 고객 (합계)</span>
+                <span class="material-symbols-outlined text-amber-500 text-2xl">groups</span>
+              </div>
+              <p class="text-3xl font-bold tracking-tight">48</p>
+              <p class="text-xs text-slate-500 mt-1">피크 시간대 집중</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">오늘 결제 건수</span>
+                <span class="material-symbols-outlined text-slate-400 text-2xl">receipt_long</span>
+              </div>
+              <p class="text-3xl font-bold tracking-tight">156</p>
+              <p class="text-xs text-slate-500 mt-1">샘플 데이터</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">오늘 매출 (원)</span>
+                <span class="material-symbols-outlined text-primary text-2xl">payments</span>
+              </div>
+              <p class="text-3xl font-bold tracking-tight">2,840,000</p>
+              <p class="text-xs text-slate-500 mt-1">중안 목업</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+              <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <h2 class="font-bold">최근 알림</h2>
+                <button type="button" class="text-sm font-semibold text-primary hover:underline">전체 보기</button>
+              </div>
+              <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                <li class="px-5 py-4 flex gap-3">
+                  <span class="material-symbols-outlined text-amber-500 shrink-0">warning</span>
+                  <div>
+                    <p class="font-semibold text-sm">세차장 ID #3 · 장비 점검 필요</p>
+                    <p class="text-xs text-slate-500 mt-0.5">10분 전</p>
+                  </div>
+                </li>
+                <li class="px-5 py-4 flex gap-3">
+                  <span class="material-symbols-outlined text-primary shrink-0">check_circle</span>
+                  <div>
+                    <p class="font-semibold text-sm">신규 입점 요청 1건 승인 대기</p>
+                    <p class="text-xs text-slate-500 mt-0.5">1시간 전</p>
+                  </div>
+                </li>
+                <li class="px-5 py-4 flex gap-3">
+                  <span class="material-symbols-outlined text-slate-400 shrink-0">info</span>
+                  <div>
+                    <p class="font-semibold text-sm">시스템 점검 예고 · 새벽 3시 ~ 4시</p>
+                    <p class="text-xs text-slate-500 mt-0.5">어제</p>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+              <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+                <h2 class="font-bold">빠른 작업</h2>
+              </div>
+              <div class="p-4 space-y-2">
+                <a
+                  href="remote.html"
+                  class="w-full flex items-center justify-center gap-2 h-12 rounded-lg bg-primary text-white font-bold text-sm shadow-lg shadow-primary/20 hover:bg-primary/90 active:scale-[0.99] transition-transform"
+                >
+                  <span class="material-symbols-outlined text-[20px]">toggle_on</span>
+                  영업 리모컨 열기
+                </a>
+                <button
+                  type="button"
+                  class="w-full flex items-center justify-center gap-2 h-12 rounded-lg border-2 border-slate-200 dark:border-slate-700 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <span class="material-symbols-outlined text-[20px]">download</span>
+                  리포트 내보내기
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <footer class="py-4 text-center text-xs text-slate-400 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          © 2024 CarWash Admin System. All rights reserved.
+        </footer>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var user = params.get('user');
+        var el = document.getElementById('welcome-msg');
+        if (el && user) {
+          el.textContent = user + ' 님';
+        }
+
+        // PWA용 서비스 워커 (https 환경에서 효과적)
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('./sw.js').catch(function () {});
+        }
+      })();
+    </script>
+  </body>
+</html>
