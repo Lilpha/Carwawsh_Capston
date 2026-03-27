@@ -84,6 +84,11 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        //이 부분에 네이버 맵 API 키를 넣어주세요.  local.properties 파일에 키를 추가하거나, 직접 오른쪽에 하드코딩 하면 됩니다.
+        manifestPlaceholders = [
+            NAVER_MAP_NCP_KEY_ID: project.findProperty("NAVER_MAP_NCP_KEY_ID") ?: "",
+            NAVER_MAP_CLIENT_ID: project.findProperty("NAVER_MAP_CLIENT_ID") ?: ""
+        ]
     }
     signingConfigs {
         debug {
@@ -118,4 +123,11 @@ dependencies {
     }
 }
 
-apply plugin: 'com.google.gms.google-services'
+def googleServicesJson = file("google-services.json")
+if (googleServicesJson.exists()) {
+    apply plugin: 'com.google.gms.google-services'
+} else {
+    logger.lifecycle("google-services.json not found in app module; skipping Google Services plugin for this build.")
+}
+
+apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
