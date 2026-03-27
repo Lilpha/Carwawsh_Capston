@@ -248,7 +248,7 @@ const HomeScreen = () => {
 
             <View style={styles.ctaRow}>
               <Pressable
-              {<}/* 네비게이션 함수!! 이 버튼을 누르면 상위 파일은 App.tsx에 해당 이름인 List으로 선언되어 있는  component={ListScreen} 으로 이동하게 됩니다. 이 형태로 유지해주시면 될 것 같아요. */}
+              {/* 네비게이션 함수!! 이 버튼을 누르면 상위 파일은 App.tsx에 해당 이름인 List으로 선언되어 있는  component={ListScreen} 으로 이동하게 됩니다. 이 형태로 유지해주시면 될 것 같아요. */}
                 onPress={() => navigation.navigate('List')}
                 style={[
                   styles.cta,
