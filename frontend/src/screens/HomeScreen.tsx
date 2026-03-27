@@ -49,7 +49,7 @@ const HomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   // Temporary test mode: bypass Firebase auth and land on map screen first.
-  //이 부분이 초기 시작화면을 결정하는 부분인데, firebaase auth 문제로
+  //이 부분이 초기 시작화면을 결정하는 부분인데, firebase auth 문제로
   // 기존 LOGIN으로 시작하던 것을 MAP으로 바꿔서 바로 지도 화면이 나오도록 했습니다.
   //이후 로그인/회원가입 기능이 supabase 기반으로 완성되면 다시 LOGIN으로 바꿔주세요.
   const [currentScreen, setCurrentScreen] = useState('MAP'); // LOGIN, SIGNUP, MAP
