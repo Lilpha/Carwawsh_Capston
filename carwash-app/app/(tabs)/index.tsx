@@ -91,8 +91,9 @@ export default function ExploreMapScreen() {
             </Pressable>
           ))}
         </View>
-
+//상단 시작
         <View style={styles.topOverlay} pointerEvents="box-none">
+          // 검색창
           <View style={styles.searchOuter} pointerEvents="box-none">
             <Pressable
               onPress={() => router.push('/search')}
@@ -133,7 +134,7 @@ export default function ExploreMapScreen() {
             })}
           </ScrollView>
         </View>
-
+//상단
         <View style={styles.bottomOverlay} pointerEvents="box-none">
           <View style={styles.bottomActions}>
             <Pressable

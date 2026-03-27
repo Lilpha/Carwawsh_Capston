@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   SafeAreaView, StyleSheet, TextInput, TouchableOpacity, Text, View, Alert, ActivityIndicator, 
   ScrollView,
   Pressable,
   Platform
 } from 'react-native';
-import auth from '@react-native-firebase/auth';
+import { supabase } from '../lib/supabase';
 import { Picker } from '@react-native-picker/picker';
 import { NaverMapView, NaverMapMarkerOverlay } from '@mj-studio/react-native-naver-map';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -52,7 +52,7 @@ const HomeScreen = () => {
   //이 부분이 초기 시작화면을 결정하는 부분인데, firebase auth 문제로
   // 기존 LOGIN으로 시작하던 것을 MAP으로 바꿔서 바로 지도 화면이 나오도록 했습니다.
   //이후 로그인/회원가입 기능이 supabase 기반으로 완성되면 다시 LOGIN으로 바꿔주세요.
-  const [currentScreen, setCurrentScreen] = useState('MAP'); // LOGIN, SIGNUP, MAP
+  const [currentScreen, setCurrentScreen] = useState('LOGIN'); // LOGIN, SIGNUP, MAP
   const [loading, setLoading] = useState(false);
   const [washes, setWashes] = useState<Wash[]>([]);
   
@@ -65,17 +65,19 @@ const HomeScreen = () => {
   // 세차장 데이터 로드 함수
   const loadWashes = async () => {
     try {
-      const response = await fetch('http://10.0.2.2:3000/api/carwashes');
-      const data: Wash[] = await response.json();
-      setWashes(
-        data.map((wash) => ({
-          ...wash,
-          latitude: Number(wash.latitude),
-          longitude: Number(wash.longitude),
-        }))
-      );
-    } catch (e) {
-      console.error('데이터 로딩 에러:', e);
+      const { data, error } = await supabase.from('shops').select('*');
+      if (error) throw error;
+      if (data) {
+        setWashes(
+          data.map((wash: any) => ({
+            ...wash,
+            latitude: Number(wash.latitude),
+            longitude: Number(wash.longitude),
+          }))
+        );
+      }
+    } catch (e: any) {
+      console.error('데이터 로딩 에러:', e.message);
     }
   };
 
@@ -90,7 +92,12 @@ const HomeScreen = () => {
     if (!email || !password) return Alert.alert('알림', '정보를 입력해주세요.');
     setLoading(true);
     try {
-      await auth().signInWithEmailAndPassword(email, password);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      
       await loadWashes();
       setCurrentScreen('MAP');
     } catch (e: any) {
@@ -103,17 +110,30 @@ const HomeScreen = () => {
     if (!email || !password || !carNumber) return Alert.alert('알림', '모든 정보를 입력해주세요.');
     setLoading(true);
     try {
-      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
-      await fetch('http://10.0.2.2:3000/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: userCredential.user.uid, email, carNumber, carType }),
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
       });
+      if (signUpError) throw signUpError;
+      
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ car_number: carNumber, car_type: carType })
+        .eq('id', data.user?.id);
+        
+      if (updateError) throw updateError;
+      
       Alert.alert('성공', '회원가입 완료! 로그인을 진행해주세요.');
       setCurrentScreen('LOGIN');
     } catch (e: any) {
       Alert.alert('가입 에러', e.message);
     } finally { setLoading(false); }
+  };
+
+  // --- 3. 로그아웃 로직 ---
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setCurrentScreen('LOGIN');
   };
 
   // --- 화면 분기 렌더링 ---
@@ -267,10 +287,10 @@ const HomeScreen = () => {
             </View>
           </View>
         </View>
-      {/* 라단 레이아웃 끝 */}
+      {/* 하단 레이아웃 끝 */}
       <TouchableOpacity 
       style={styles.logoutBtn}
-      onPress={() =>  Alert.alert('알림', '로그아웃 버튼 클릭됨. supabase 단 추가요청')}>
+      onPress={handleLogout}>
         <Text style={{ color: 'white', fontWeight: 'bold' }}>로그아웃</Text>
       </TouchableOpacity>
     </View>
