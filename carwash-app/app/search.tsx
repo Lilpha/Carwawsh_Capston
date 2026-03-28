@@ -67,9 +67,9 @@ const SEARCH_ITEMS: SearchItem[] = [
 const RECENT_SEARCHES = ['강남 손세차', '24시 자동세차', '셀프세차장', '분당 노터치'];
 
 const RECENT_VISITS = [
-  { id: 'v1', name: '워시존 하이테크 강남점', address: '서울특별시 강남구 테헤란로 123', date: '2023.11.24 방문' },
-  { id: 'v2', name: '코엑스 주차장 B2', address: '서울특별시 강남구 봉은사로 524', date: '2023.11.22 방문' },
-  { id: 'v3', name: '버블사인 역삼본점', address: '서울특별시 강남구 역삼로 45', date: '2023.11.18 방문' },
+  { id: 'v1', name: '워시존 하이테크 강남점', address: '서울특별시 강남구 테헤란로 123', date: '2023.11.24 조회' },
+  { id: 'v2', name: '코엑스 주차장 B2', address: '서울특별시 강남구 봉은사로 524', date: '2023.11.22 조회' },
+  { id: 'v3', name: '버블사인 역삼본점', address: '서울특별시 강남구 역삼로 45', date: '2023.11.18 조회' },
 ];
 
 const POPULAR_NEARBY = [
@@ -171,7 +171,7 @@ export default function SearchScreen() {
               ))}
             </View>
 
-            <Text style={[styles.sectionTitleK, { color: colors.text, marginTop: 8 }]}>최근 방문지</Text>
+            <Text style={[styles.sectionTitleK, { color: colors.text, marginTop: 8 }]}>최근에 본 곳</Text>
             {RECENT_VISITS.map((v, idx) => (
               <View
                 key={v.id}
@@ -223,10 +223,10 @@ export default function SearchScreen() {
               style={styles.filterScroll}
               contentContainerStyle={styles.filterRow}
             >
-              <FilterChip text="Distance" active icon />
-              <FilterChip text="Price" icon />
-              <FilterChip text="Open now" />
-              <FilterChip text="Type" icon />
+              <FilterChip text="거리" active icon />
+              <FilterChip text="참고 가격대" icon />
+              <FilterChip text="영업 중" />
+              <FilterChip text="시설 유형" icon />
             </ScrollView>
 
             <FlatList
@@ -260,7 +260,7 @@ export default function SearchScreen() {
 
                     <View style={styles.cardBottom}>
                       <StatusBadge status={item.status} />
-                      <Text style={[styles.price, { color: colors.primary }]}>{item.priceRange}</Text>
+                      <Text style={[styles.price, { color: colors.primary }]}>참고 {item.priceRange}</Text>
                     </View>
                   </View>
                 </Pressable>

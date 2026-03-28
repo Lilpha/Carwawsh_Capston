@@ -17,7 +17,7 @@ export default function RootLayout() {
         name="carwash-detail"
         options={{
           presentation: 'transparentModal',
-          animation: 'slide_from_bottom',
+          animation: 'none',
         }}
       />
       <Stack.Screen name="carwash-info" />

@@ -1,5 +1,7 @@
 import { Alert, Linking, Platform } from 'react-native';
 
+/** 설치된 지도/내비 앱으로 목적지 좌표를 넘깁니다. 차량·결제와 연동되지 않습니다. */
+
 export type NavigationDestination = {
   id: string;
   name: string;
