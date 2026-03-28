@@ -14,7 +14,8 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 
-const INITIAL_COORD = { latitude: 37.5665, longitude: 126.9780 };
+// 1. 상단 INITIAL_COORD를 춘천(한림대)으로 통일
+const INITIAL_COORD = { latitude: 37.8865, longitude: 127.7385 };
 
 const FILTERS = [
   { key: 'hotwater', label: 'Hot Water', icon: 'ac-unit', active: true },
@@ -81,9 +82,18 @@ const HomeScreen = () => {
     }
   };
 
+  // 2. useEffect에서 전체 로드 대신 '주변 로드' 호출
   useEffect(() => {
+    // 1. 화면 전환 시 무조건 입력창 비우기
+    setEmail('');
+    setPassword('');
+    setCarNumber('');
+    setCarType('승용');
+    setLoading(false);
+
+    // 2. 만약 지도로 넘어온 경우라면 세차장 데이터 로드
     if (currentScreen === 'MAP') {
-      loadWashes();
+      fetchNearbyWashes(INITIAL_COORD.latitude, INITIAL_COORD.longitude);
     }
   }, [currentScreen]);
 
@@ -104,6 +114,7 @@ const HomeScreen = () => {
       
       // 로그인 성공 시 지도로 이동
       await loadWashes();
+      await fetchNearbyWashes(INITIAL_COORD.latitude, INITIAL_COORD.longitude);
       setCurrentScreen('MAP');
     } catch (e: any) {
       Alert.alert('로그인 실패', e.message);
@@ -139,6 +150,26 @@ const HomeScreen = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setCurrentScreen('LOGIN');
+  };
+
+  // 주변 세차장 데이터를 가져오는 함수
+  const fetchNearbyWashes = async (lat: number, lng: number) => {
+    try {
+      const { data, error } = await supabase.rpc('get_nearby_washes', {
+        user_lat: lat,
+        user_lng: lng
+      });
+      if (error) throw error;
+      if (data) {
+        setWashes(data.map((w: any) => ({
+          ...w,
+          latitude: Number(w.latitude),
+          longitude: Number(w.longitude),
+        })));
+      }
+    } catch (e: any) {
+      console.error('검색 실패:', e.message);
+    }
   };
 
   // --- 화면 분기 렌더링 ---
@@ -193,22 +224,25 @@ const HomeScreen = () => {
   return (
     <View style={styles.mapContainer}>
       <NaverMapView
-        style={StyleSheet.absoluteFill}
-        initialCamera={{
-          ...INITIAL_COORD,
-          zoom: 14,
+        style={styles.map}
+        initialCamera={{ 
+          latitude: INITIAL_COORD.latitude, 
+          longitude: INITIAL_COORD.longitude, 
+          zoom: 15 
+        }}
+        onCameraChanged={(e) => {
+          fetchNearbyWashes(e.latitude, e.longitude);
         }}
       >
+        {/* 마커들은 그대로 둡니다 */}
         {washes.map((wash) => (
-          //미카 셍성 내용.
-          //https://rnnavermap.mjstudio.net/docs/components/naver-map-view
           <NaverMapMarkerOverlay
             key={`wash-${wash.id}`}
             latitude={wash.latitude}
             longitude={wash.longitude}
             image={{ symbol: wash.status === '동파' ? 'red' : 'green' }}
-            anchor={{ x: 0.5, y: 1 }}
             caption={{ text: wash.name }}
+            onTap={() => Alert.alert(wash.name, `${wash.address}\n상태: ${wash.status}`)}
           />
         ))}
       </NaverMapView>
