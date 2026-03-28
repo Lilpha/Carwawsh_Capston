@@ -1,10 +1,25 @@
+/**
+ * carwash-app/app/search.tsx 포팅 (Expo Router → React Navigation)
+ * develop_log/navigation_guide.md 의 Stack 등록·navigate 패턴을 따릅니다.
+ */
 import { useMemo, useRef, useState } from 'react';
-import { FlatList, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { router } from 'expo-router';
+import {
+  FlatList,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useColorScheme,
+  View,
+  Alert,
+} from 'react-native';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/types';
 
 type SearchItem = {
   id: 'ecowash' | 'quickshine' | 'flashclean' | 'elite';
@@ -92,6 +107,7 @@ const POPULAR_NEARBY = [
 ];
 
 export default function SearchScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const scheme = useColorScheme() ?? 'light';
   const isDark = scheme === 'dark';
   const [query, setQuery] = useState('');
@@ -118,15 +134,20 @@ export default function SearchScreen() {
 
   const isEmptyQuery = query.trim().length === 0;
 
+  const onResultPress = (item: SearchItem) => {
+    // 상세 스택(CarWashDetail) 연결 시 navigation.navigate('Detail', { id: item.id }) 로 교체
+    Alert.alert('선택됨', `${item.name} (id: ${item.id})`);
+  };
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]} edges={['top']}>
       <View style={[styles.container, { backgroundColor: colors.surface }]}>
         <View style={styles.header}>
-          <Pressable style={styles.iconBtn} onPress={() => router.back()}>
+          <Pressable style={styles.iconBtn} onPress={() => navigation.goBack()}>
             <MaterialIcons name="arrow-back" size={22} color={colors.text} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Search Car Wash</Text>
-          <Pressable style={styles.iconBtn} onPress={() => router.push('/(tabs)')}>
+          <Pressable style={styles.iconBtn} onPress={() => navigation.navigate('MainTabs')}>
             <MaterialIcons name="map" size={22} color={colors.text} />
           </Pressable>
         </View>
@@ -236,7 +257,7 @@ export default function SearchScreen() {
               ListHeaderComponent={<Text style={[styles.sectionTitle, { color: colors.text }]}>Nearby Results</Text>}
               renderItem={({ item }) => (
                 <Pressable
-                  onPress={() => router.push({ pathname: '/carwash-detail', params: { id: item.id } })}
+                  onPress={() => onResultPress(item)}
                   style={[
                     styles.card,
                     { backgroundColor: colors.card, borderColor: colors.border, opacity: item.status === 'closed' ? 0.82 : 1 },
@@ -404,4 +425,3 @@ const styles = StyleSheet.create({
   empty: { paddingVertical: 30, alignItems: 'center' },
   emptyText: { fontSize: 14, fontWeight: '600' },
 });
-

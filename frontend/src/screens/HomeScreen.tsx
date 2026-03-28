@@ -1,9 +1,10 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   SafeAreaView, StyleSheet, TextInput, TouchableOpacity, Text, View, Alert, ActivityIndicator, 
   ScrollView,
   Pressable,
-  Platform
+  Platform,
+  Modal,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { Picker } from '@react-native-picker/picker';
@@ -12,16 +13,13 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import type { RootStackParamList } from '../navigation/types';
+import {
+  MAP_FACILITY_FILTER_OPTIONS,
+  type MapFacilityFilterKey,
+} from '../lib/map-facility-filters';
 
 const INITIAL_COORD = { latitude: 37.5665, longitude: 126.9780 };
-
-const FILTERS = [
-  { key: 'hotwater', label: 'Hot Water', icon: 'ac-unit', active: true },
-  { key: 'indoor', label: 'Indoor Bay', icon: 'home', active: false },
-  { key: 'ev', label: 'EV Charging', icon: 'bolt', active: false },
-  { key: 'card', label: 'Card Payment', icon: 'credit-card', active: false },
-];
 
 // 고정된 테마 색상 (App.tsx용 라이트모드 기준)
 const colors = {
@@ -42,8 +40,42 @@ type Wash = {
   longitude: number;
   address: string;
   status: string;
-  hasHeatedWater: boolean;
+  hasHeatedWater?: boolean;
+  /** shops 연동 시 camelCase 또는 has_indoor_bay 등으로 올 수 있음 */
+  hasIndoorBay?: boolean;
+  hasEvCharging?: boolean;
 };
+
+/** Supabase/스프레드 row의 불리언·null·문자열·snake_case 대응 */
+function isTruthyFacilityFlag(value: unknown): boolean {
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0 || value === null || value === undefined) return false;
+  if (typeof value === 'string') {
+    const t = value.trim().toLowerCase();
+    return t === 'true' || t === '1' || t === 'yes';
+  }
+  return false;
+}
+
+type WashRow = Wash & Record<string, unknown>;
+
+function washMatchesFacilityFilters(
+  wash: WashRow,
+  filters: Set<MapFacilityFilterKey>,
+): boolean {
+  if (filters.size === 0) return true;
+  const hot = isTruthyFacilityFlag(wash.hasHeatedWater);
+  const indoor =
+    isTruthyFacilityFlag(wash.hasIndoorBay) ||
+    isTruthyFacilityFlag(wash.has_indoor_bay);
+  const ev =
+    isTruthyFacilityFlag(wash.hasEvCharging) ||
+    isTruthyFacilityFlag(wash.has_ev_charging);
+  if (filters.has('hotwater') && !hot) return false;
+  if (filters.has('indoor') && !indoor) return false;
+  if (filters.has('ev') && !ev) return false;
+  return true;
+}
 
 const HomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -55,6 +87,12 @@ const HomeScreen = () => {
   const [currentScreen, setCurrentScreen] = useState('LOGIN'); // LOGIN, SIGNUP, MAP
   const [loading, setLoading] = useState(false);
   const [washes, setWashes] = useState<Wash[]>([]);
+  /** 선택된 시설 필터. 비어 있으면 필터 미적용(전체). 데이터 연동 시 이 Set을 쿼리 조건으로 넘기면 됩니다. */
+  const [selectedFacilityFilters, setSelectedFacilityFilters] = useState<
+    Set<MapFacilityFilterKey>
+  >(() => new Set());
+  /** 지도 마커 탭 시 표시할 세차장 (develop_log: 모달/바텀시트 패턴, 네비 구조 변경 없음) */
+  const [selectedWash, setSelectedWash] = useState<Wash | null>(null);
   
   // 가입/로그인용 공통 상태
   const [email, setEmail] = useState('');
@@ -86,6 +124,13 @@ const HomeScreen = () => {
       loadWashes();
     }
   }, [currentScreen]);
+
+  const visibleWashes = useMemo(() => {
+    if (selectedFacilityFilters.size === 0) return washes;
+    return washes.filter((wash) =>
+      washMatchesFacilityFilters(wash as WashRow, selectedFacilityFilters),
+    );
+  }, [washes, selectedFacilityFilters]);
 
   // --- 1. 로그인 로직 ---
   const handleLogin = async () => {
@@ -194,7 +239,7 @@ const HomeScreen = () => {
           zoom: 14,
         }}
       >
-        {washes.map((wash) => (
+        {visibleWashes.map((wash) => (
           //미카 셍성 내용.
           //https://rnnavermap.mjstudio.net/docs/components/naver-map-view
           <NaverMapMarkerOverlay
@@ -204,6 +249,7 @@ const HomeScreen = () => {
             image={{ symbol: wash.status === '동파' ? 'red' : 'green' }}
             anchor={{ x: 0.5, y: 1 }}
             caption={{ text: wash.name }}
+            onTap={() => setSelectedWash(wash)}
           />
         ))}
       </NaverMapView>
@@ -213,15 +259,14 @@ const HomeScreen = () => {
         {/* 검색창 */}
         <View style={styles.searchOuter} pointerEvents="box-none">
           <Pressable
-            onPress={() => Alert.alert('알림', '검색 화면으로 이동합니다.')}
+            onPress={() => navigation.getParent()?.navigate('Search')}
             style={[
               styles.search,
               { backgroundColor: colors.panel, borderColor: colors.panelBorder, shadowColor: '#000' },
             ]}
           >
             <MaterialIcons name="search" size={22} color={colors.primary} style={styles.searchIcon} />
-            <Text style={[styles.searchPlaceholder, { color: colors.muted }]}>Where to?</Text>
-            <MaterialIcons name="mic" size={22} color={colors.tabMuted} />
+            <Text style={[styles.searchPlaceholder, { color: colors.muted }]}>세차장 이름·지역 검색</Text>
           </Pressable>
         </View>
 
@@ -231,12 +276,19 @@ const HomeScreen = () => {
           contentContainerStyle={styles.filters}
           style={styles.filtersScroll}
         >
-          {FILTERS.map((f) => {
-            const active = f.active;
+          {MAP_FACILITY_FILTER_OPTIONS.map((f) => {
+            const active = selectedFacilityFilters.has(f.key);
             return (
               <Pressable
-                onPress={() => Alert.alert('알림', `${f.key} 버튼 클릭됨.`)}
                 key={f.key}
+                onPress={() => {
+                  setSelectedFacilityFilters((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(f.key)) next.delete(f.key);
+                    else next.add(f.key);
+                    return next;
+                  });
+                }}
                 style={[
                   styles.chip,
                   {
@@ -245,7 +297,7 @@ const HomeScreen = () => {
                   },
                 ]}
               >
-                <MaterialIcons name={f.icon as any} size={18} color={active ? '#fff' : colors.muted} />
+                <MaterialIcons name={f.icon} size={18} color={active ? '#fff' : colors.muted} />
                 <Text style={[styles.chipText, { color: active ? '#fff' : colors.muted }]}>{f.label}</Text>
               </Pressable>
             );
@@ -269,7 +321,7 @@ const HomeScreen = () => {
             <View style={styles.ctaRow}>
               {/* 네비게이션 함수!! 이 버튼을 누르면 상위 파일은 App.tsx에 해당 이름인 List으로 선언되어 있는  component={ListScreen} 으로 이동하게 됩니다. 이 형태로 유지해주시면 될 것 같아요. */}
               <Pressable
-                onPress={() => navigation.navigate('List')}
+                onPress={() => navigation.getParent()?.navigate('List')}
                 style={[
                   styles.cta,
                   { backgroundColor: colors.panel, borderColor: colors.panelBorder, shadowColor: '#000' },
@@ -279,7 +331,7 @@ const HomeScreen = () => {
                 <Text style={[styles.ctaText, { color: colors.text }]}>List View</Text>
               </Pressable>
               <Pressable 
-              onPress={() => Alert.alert('알림', '리스트 뷰 버튼 클릭됨.')}
+              onPress={() => Alert.alert('알림', 'my location 버튼 클릭됨.')}
               style={[styles.cta, { backgroundColor: colors.primary, borderColor: 'transparent' }]}>
                 <MaterialIcons name="near-me" size={20} color="#fff" />
                 <Text style={[styles.ctaText, { color: '#fff' }]}>My Location</Text>
@@ -288,6 +340,41 @@ const HomeScreen = () => {
           </View>
         </View>
       {/* 하단 레이아웃 끝 */}
+      <Modal
+        visible={selectedWash !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedWash(null)}
+      >
+        <View style={styles.washDetailModalRoot}>
+          <Pressable
+            style={styles.washDetailBackdrop}
+            onPress={() => setSelectedWash(null)}
+            accessibilityRole="button"
+            accessibilityLabel="닫기"
+          />
+          {selectedWash ? (
+            <View style={[styles.washDetailSheet, { borderColor: colors.panelBorder }]}>
+              <View style={styles.washDetailSheetHeader}>
+                <Text style={[styles.washDetailTitle, { color: colors.text }]} numberOfLines={2}>
+                  {selectedWash.name}
+                </Text>
+                <Pressable
+                  onPress={() => setSelectedWash(null)}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel="상세 닫기"
+                >
+                  <MaterialIcons name="close" size={22} color={colors.muted} />
+                </Pressable>
+              </View>
+              <Text style={[styles.washDetailAddress, { color: colors.muted }]} numberOfLines={4}>
+                {selectedWash.address}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
       <TouchableOpacity 
       style={styles.logoutBtn}
       onPress={handleLogout}>
@@ -458,6 +545,49 @@ const styles = StyleSheet.create({
   linkText: { textAlign: 'center', marginTop: 20, color: '#007AFF' },
   mapContainer: { flex: 1 },
   map: { width: '100%', height: '100%' },
+  washDetailModalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  washDetailBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+  },
+  washDetailSheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderTopWidth: 1,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 28,
+    maxHeight: '40%',
+    ...Platform.select({
+      ios: {
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: -4 },
+      },
+      android: { elevation: 12 },
+    }),
+  },
+  washDetailSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 10,
+  },
+  washDetailTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  washDetailAddress: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
   logoutBtn: { position: 'absolute', bottom: 40, right: 20, backgroundColor: 'rgba(255,59,48,0.9)', padding: 15, borderRadius: 30 }
   
 });

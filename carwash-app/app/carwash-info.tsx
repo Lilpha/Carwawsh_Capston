@@ -141,37 +141,34 @@ export default function CarwashInfoScreen() {
               <Text style={[styles.distanceText, { color: colors.primary }]}>{info.distanceText}</Text>
             </View>
 
+            <Text style={[styles.disclaimer, { color: colors.muted }]}>
+              대기·가격·소요 시간은 참고용입니다. 방문 전 현장 안내를 확인해 주세요.
+            </Text>
+
             <View style={styles.statsGrid}>
-              <InfoCard icon="schedule" label="Wait Time" value={info.waitText} colors={colors} />
-              <InfoCard icon="payments" label="Price From" value={info.priceFrom} colors={colors} />
-              <InfoCard icon="history" label="Duration" value={info.durationText} colors={colors} />
+              <InfoCard icon="schedule" label="예상 대기" value={info.waitText} colors={colors} />
+              <InfoCard icon="sell" label="참고 가격(부터)" value={info.priceFrom} colors={colors} />
+              <InfoCard icon="timer" label="예상 소요" value={info.durationText} colors={colors} />
             </View>
 
-            <SectionTitle text="Available Services" color={colors.text} />
+            <SectionTitle text="서비스 안내" color={colors.text} />
             <ServiceRow
               icon="directions-car"
               title="Automatic Wash"
-              subtitle="Fast & Efficient touchless"
+              subtitle="노터치·자동 라인 (예시)"
               price="$12.00"
               colors={colors}
             />
             <ServiceRow
               icon="pan-tool-alt"
               title="Hand Wash & Wax"
-              subtitle="Premium care for your car"
+              subtitle="손세차·왁스 (예시)"
               price="$25.00"
               popular
               colors={colors}
             />
 
-            <SectionTitle text="Payment Methods" color={colors.text} />
-            <View style={styles.paymentRow}>
-              <PaymentChip icon="credit-card" label="Credit Card" colors={colors} />
-              <PaymentChip icon="payment" label="Apple Pay" colors={colors} />
-              <PaymentChip icon="contactless" label="G Pay" colors={colors} />
-            </View>
-
-            <SectionTitle text="Location" color={colors.text} />
+            <SectionTitle text="위치" color={colors.text} />
             <View style={styles.mapPreviewWrap}>
               <ImageBackground source={{ uri: MINI_MAP_URI }} style={styles.mapPreview}>
                 <View style={styles.mapPin}>
@@ -183,29 +180,21 @@ export default function CarwashInfoScreen() {
         </ScrollView>
 
         <View style={[styles.bottomCtaWrap, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-          <View style={styles.bottomCtaRow}>
-            <Pressable
-              style={[styles.navBtn, { borderColor: colors.primary, backgroundColor: colors.surface }]}
-              onPress={() =>
-                openNavigationSelector({
-                  id: info.id,
-                  name: info.name,
-                  address: info.address,
-                  latitude: info.latitude,
-                  longitude: info.longitude,
-                })
-              }
-            >
-              <MaterialIcons name="near-me" size={18} color={colors.primary} />
-              <Text style={[styles.navBtnText, { color: colors.primary }]}>Start Navigation</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.reserveBtn, { backgroundColor: colors.primary }]}
-              onPress={() => Alert.alert('준비중', '예약 기능은 다음 단계에서 구현합니다.')}
-            >
-              <Text style={styles.reserveBtnText}>Reserve Now</Text>
-            </Pressable>
-          </View>
+          <Pressable
+            style={[styles.navBtnFull, { backgroundColor: colors.primary }]}
+            onPress={() =>
+              openNavigationSelector({
+                id: info.id,
+                name: info.name,
+                address: info.address,
+                latitude: info.latitude,
+                longitude: info.longitude,
+              })
+            }
+          >
+            <MaterialIcons name="near-me" size={20} color="#fff" />
+            <Text style={styles.navBtnFullText}>길찾기 앱에서 열기</Text>
+          </Pressable>
         </View>
       </View>
     </SafeAreaView>
@@ -279,23 +268,6 @@ function ServiceRow({
   );
 }
 
-function PaymentChip({
-  icon,
-  label,
-  colors,
-}: {
-  icon: React.ComponentProps<typeof MaterialIcons>['name'];
-  label: string;
-  colors: { card: string; text: string };
-}) {
-  return (
-    <View style={[styles.paymentChip, { backgroundColor: colors.card }]}>
-      <MaterialIcons name={icon} size={16} color={colors.text} />
-      <Text style={[styles.paymentText, { color: colors.text }]}>{label}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   container: { flex: 1 },
@@ -350,6 +322,8 @@ const styles = StyleSheet.create({
   },
   openBadgeText: { color: '#15803d', fontSize: 11, fontWeight: '800' },
 
+  disclaimer: { fontSize: 12, fontWeight: '600', lineHeight: 17, marginBottom: 12 },
+
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, marginBottom: 14 },
   ratingLeft: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   ratingValue: { fontSize: 13, fontWeight: '900' },
@@ -378,10 +352,6 @@ const styles = StyleSheet.create({
   servicePrice: { fontSize: 22, fontWeight: '900' },
   popularBadge: { fontSize: 10, fontWeight: '900', marginTop: 2 },
 
-  paymentRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  paymentChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
-  paymentText: { fontSize: 12, fontWeight: '700' },
-
   mapPreviewWrap: { height: 128, borderRadius: 12, overflow: 'hidden', marginBottom: 14 },
   mapPreview: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   mapPin: {
@@ -405,25 +375,15 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 16,
   },
-  bottomCtaRow: { flexDirection: 'row', gap: 10 },
-  navBtn: {
-    flex: 1,
+  navBtnFull: {
+    width: '100%',
     height: 56,
     borderRadius: 12,
-    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
   },
-  navBtnText: { fontSize: 14, fontWeight: '900' },
-  reserveBtn: {
-    flex: 1.4,
-    height: 56,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reserveBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  navBtnFullText: { color: '#fff', fontSize: 15, fontWeight: '900' },
 });
 

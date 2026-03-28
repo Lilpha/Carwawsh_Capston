@@ -1,12 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
-// @ts-ignore (타입 선언이 없다면 무시하도록 추가)
 import { EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY } from '@env';
 
-const supabaseUrl = EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = (EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
+const supabaseAnonKey = (EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("⚠️ 환경 변수가 로드되지 않았습니다. .env 파일과 babel 설정을 확인하세요.");
+  throw new Error(
+    'Supabase URL/키가 없습니다. frontend 폴더에 .env 파일을 만들고 EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY 를 설정하세요. (.env.example 참고) 저장 후 Metro를 --reset-cache 로 다시 실행하세요.',
+  );
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

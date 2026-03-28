@@ -28,7 +28,7 @@ export default function VehicleEditScreen() {
         <Pressable style={styles.iconBtn} onPress={() => router.back()}>
           <MaterialIcons name="arrow-back" size={22} color={colors.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>차량 등록</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>차량 메모 추가</Text>
         <View style={styles.iconBtn} />
       </View>
 
@@ -52,7 +52,7 @@ export default function VehicleEditScreen() {
         <View style={[styles.switchRow, { borderColor: colors.border }]}>
           <View>
             <Text style={[styles.switchTitle, { color: colors.text }]}>기본 차량으로 설정</Text>
-            <Text style={[styles.switchDesc, { color: colors.muted }]}>길찾기/예약 시 기본 선택됩니다.</Text>
+            <Text style={[styles.switchDesc, { color: colors.muted }]}>길찾기 등에서 기본으로 표시할 차량입니다.</Text>
           </View>
           <Switch value={isPrimary} onValueChange={setIsPrimary} trackColor={{ true: colors.primary }} />
         </View>

@@ -35,11 +35,14 @@ export default function VehiclesScreen() {
         <Pressable style={styles.iconBtn} onPress={() => router.back()}>
           <MaterialIcons name="arrow-back" size={22} color={colors.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>내 차량 관리</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>차량 메모</Text>
         <View style={styles.iconBtn} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        <Text style={[styles.hint, { color: colors.muted }]}>
+          세차장 방문 시 차량을 구분하기 위한 메모입니다. 점검·전기차 상태와는 연동되지 않습니다.
+        </Text>
         {VEHICLES.map((v) => (
           <View key={v.id} style={[styles.card, { backgroundColor: colors.panel, borderColor: colors.border }]}>
             <View style={styles.cardLeft}>
@@ -84,6 +87,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: '900' },
 
   content: { padding: 16, gap: 10 },
+  hint: { fontSize: 12, fontWeight: '600', lineHeight: 17, marginBottom: 4 },
   card: {
     borderWidth: 1,
     borderRadius: 14,

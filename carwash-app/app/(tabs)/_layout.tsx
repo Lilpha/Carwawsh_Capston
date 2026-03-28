@@ -23,28 +23,28 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: '지도',
           tabBarIcon: ({ color, size }) => <MaterialIcons name="map" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          title: 'History',
+          title: '기록',
           tabBarIcon: ({ color, size }) => <MaterialIcons name="history" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="saved"
         options={{
-          title: 'Saved',
+          title: '저장',
           tabBarIcon: ({ color, size }) => <MaterialIcons name="favorite" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: '내 정보',
           tabBarIcon: ({ color, size }) => <MaterialIcons name="person" size={size} color={color} />,
         }}
       />

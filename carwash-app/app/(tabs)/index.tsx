@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ImageBackground,
   Platform,
@@ -12,6 +12,8 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { CarwashDetailSheet } from '@/components/carwash-detail-sheet';
+import { MAP_FACILITY_FILTER_OPTIONS, type MapFacilityFilterKey } from '@/lib/map-facility-filters';
 
 type Marker = {
   id: string;
@@ -31,14 +33,10 @@ const MARKERS: Marker[] = [
   { id: 'flashclean', name: 'FlashClean', color: '#F43F5E', top: '66%', left: '46%', faded: true },
 ];
 
-const FILTERS = [
-  { key: 'hotwater', label: 'Hot Water', icon: 'ac-unit', active: true },
-  { key: 'indoor', label: 'Indoor Bay', icon: 'home', active: false },
-  { key: 'ev', label: 'EV Charging', icon: 'bolt', active: false },
-  { key: 'card', label: 'Card Payment', icon: 'credit-card', active: false },
-] as const;
-
 export default function ExploreMapScreen() {
+  const [selectedWashId, setSelectedWashId] = useState<string | null>(null);
+  /** 선택된 시설 필터. 비어 있으면 “필터 미적용(전체)”로 두고, 데이터 연동 시 이 Set을 쿼리 조건으로 넘기면 됩니다. */
+  const [selectedFacilityFilters, setSelectedFacilityFilters] = useState<Set<MapFacilityFilterKey>>(() => new Set());
   const scheme = useColorScheme() ?? 'light';
   const isDark = scheme === 'dark';
 
@@ -70,7 +68,7 @@ export default function ExploreMapScreen() {
             <Pressable
               key={m.id}
               style={[styles.markerWrap, { top: m.top as any, left: m.left as any }]}
-              onPress={() => router.push({ pathname: '/carwash-detail', params: { id: m.id } })}
+              onPress={() => setSelectedWashId(m.id)}
               hitSlop={12}
             >
               <View style={styles.markerInner}>
@@ -91,9 +89,8 @@ export default function ExploreMapScreen() {
             </Pressable>
           ))}
         </View>
-//상단 시작
+
         <View style={styles.topOverlay} pointerEvents="box-none">
-          // 검색창
           <View style={styles.searchOuter} pointerEvents="box-none">
             <Pressable
               onPress={() => router.push('/search')}
@@ -103,8 +100,7 @@ export default function ExploreMapScreen() {
               ]}
             >
               <MaterialIcons name="search" size={22} color={colors.primary} style={styles.searchIcon} />
-              <Text style={[styles.searchPlaceholder, { color: colors.muted }]}>Where to?</Text>
-              <MaterialIcons name="mic" size={22} color={colors.tabMuted} />
+              <Text style={[styles.searchPlaceholder, { color: colors.muted }]}>세차장 이름·지역 검색</Text>
             </Pressable>
           </View>
 
@@ -114,11 +110,19 @@ export default function ExploreMapScreen() {
             contentContainerStyle={styles.filters}
             style={styles.filtersScroll}
           >
-            {FILTERS.map((f) => {
-              const active = f.active;
+            {MAP_FACILITY_FILTER_OPTIONS.map((f) => {
+              const active = selectedFacilityFilters.has(f.key);
               return (
                 <Pressable
                   key={f.key}
+                  onPress={() => {
+                    setSelectedFacilityFilters((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(f.key)) next.delete(f.key);
+                      else next.add(f.key);
+                      return next;
+                    });
+                  }}
                   style={[
                     styles.chip,
                     {
@@ -127,14 +131,14 @@ export default function ExploreMapScreen() {
                     },
                   ]}
                 >
-                  <MaterialIcons name={f.icon as any} size={18} color={active ? '#fff' : colors.muted} />
+                  <MaterialIcons name={f.icon} size={18} color={active ? '#fff' : colors.muted} />
                   <Text style={[styles.chipText, { color: active ? '#fff' : colors.muted }]}>{f.label}</Text>
                 </Pressable>
               );
             })}
           </ScrollView>
         </View>
-//상단
+
         <View style={styles.bottomOverlay} pointerEvents="box-none">
           <View style={styles.bottomActions}>
             <Pressable
@@ -155,7 +159,7 @@ export default function ExploreMapScreen() {
                 ]}
               >
                 <MaterialIcons name="list" size={20} color={colors.primary} />
-                <Text style={[styles.ctaText, { color: colors.text }]}>List View</Text>
+                <Text style={[styles.ctaText, { color: colors.text }]}>목록 보기</Text>
               </Pressable>
               <Pressable style={[styles.cta, { backgroundColor: colors.primary, borderColor: 'transparent' }]}>
                 <MaterialIcons name="near-me" size={20} color="#fff" />
@@ -164,6 +168,10 @@ export default function ExploreMapScreen() {
             </View>
           </View>
         </View>
+
+        {selectedWashId != null ? (
+          <CarwashDetailSheet washId={selectedWashId} onClose={() => setSelectedWashId(null)} />
+        ) : null}
       </View>
     </SafeAreaView>
   );

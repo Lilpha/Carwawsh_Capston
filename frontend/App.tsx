@@ -2,12 +2,11 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import TabNavigator from './src/navigation/TabNavigator';
+import type { RootStackParamList } from './src/navigation/types';
 import ListScreen from './src/screens/ListScreen';
+import SearchScreen from './src/screens/SearchScreen';
 
-export type RootStackParamList = {
-  MainTabs: undefined;
-  List: undefined; // 전체 화면으로 뜰 리스트 스크린 타입 추가
-};
+export type { RootStackParamList };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -31,6 +30,11 @@ export default function App() {
             // modal 효과를 주고 싶다면 (IOS에서 위에서 아래로 올라옴):
             // presentation: 'modal' 
           }} 
+        />
+        <Stack.Screen
+          name="Search"
+          component={SearchScreen}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>
