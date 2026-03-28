@@ -92,16 +92,21 @@ const HomeScreen = () => {
     if (!email || !password) return Alert.alert('알림', '정보를 입력해주세요.');
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      if (error) throw error;
       
+      if (error) {
+        console.error("로그인 상세 에러:", error.message); // 터미널에서 확인용
+        throw error;
+      }
+      
+      // 로그인 성공 시 지도로 이동
       await loadWashes();
       setCurrentScreen('MAP');
     } catch (e: any) {
-      Alert.alert('로그인 실패', '이메일 또는 비밀번호를 확인하세요.');
+      Alert.alert('로그인 실패', e.message);
     } finally { setLoading(false); }
   };
 

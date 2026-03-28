@@ -18,11 +18,11 @@
       tools:replace="android:appComponentFactory">
 
       <meta-data
-        android:name="com.naver.maps.map.NCP_KEY_ID"
-        android:value="${NAVER_MAP_NCP_KEY_ID}" />
-      <meta-data
         android:name="com.naver.maps.map.CLIENT_ID"
-        android:value="${NAVER_MAP_CLIENT_ID}" />
+        android:value="kq20xxzj8d" />
+      <meta-data
+        android:name="com.naver.maps.map.NCP_KEY_ID"
+        android:value="kq20xxzj8d" />
 
       <activity
         android:name=".MainActivity"
