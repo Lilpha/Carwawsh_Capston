@@ -153,11 +153,15 @@ const HomeScreen = () => {
   };
 
   // 주변 세차장 데이터를 가져오는 함수
-  const fetchNearbyWashes = async (lat: number, lng: number) => {
+  const fetchNearbyWashes = async (lat: number, lng: number, limit: number = 10) => {
     try {
+      // RPC 함수 호출 시 search_limit을 함께 보냅니다.
       const { data, error } = await supabase.rpc('get_nearby_washes', {
         user_lat: lat,
-        user_lng: lng
+        user_lng: lng,
+        search_limit: limit,  // * 줌 레벨에 따라 변하는 숫자
+        is_hotwater: false,   // (Step 4에서 상태값을 관리할 예정입니다)
+        is_indoor: false
       });
       if (error) throw error;
       if (data) {
@@ -228,10 +232,28 @@ const HomeScreen = () => {
         initialCamera={{ 
           latitude: INITIAL_COORD.latitude, 
           longitude: INITIAL_COORD.longitude, 
-          zoom: 15 
+          zoom: 15
         }}
         onCameraChanged={(e) => {
-          fetchNearbyWashes(e.latitude, e.longitude);
+          const { latitude, longitude, zoom = 15 } = e;
+
+          // zoom 레벨에 따른 마커 개수 분기
+          let markerLimit = 10;
+
+          if (zoom >= 16) {
+            markerLimit = 5;  // 아주 가까움: 정밀하게 5개만
+          } else if (zoom >= 14) {
+            markerLimit = 15;  // 아주 가까움: 정밀하게 5개만
+          } else if (zoom >= 12) {
+            markerLimit = 30;  // 아주 가까움: 정밀하게 5개만
+          } else {
+            markerLimit = 50;  // 아주 가까움: 정밀하게 5개만
+          }
+
+          console.log(`현재 줌: ${zoom.toFixed(1)}, 요청 개수: ${markerLimit}개`);
+
+          // 결정된 개수로 데이터 요청
+          fetchNearbyWashes(latitude, longitude, markerLimit);
         }}
       >
         {/* 마커들은 그대로 둡니다 */}
