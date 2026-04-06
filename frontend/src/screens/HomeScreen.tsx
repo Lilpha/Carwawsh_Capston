@@ -63,6 +63,14 @@ const HomeScreen = () => {
   const [carNumber, setCarNumber] = useState('');
   const [carType, setCarType] = useState('승용');
 
+  // 온수, 실내 베이 여부 상태
+  const [isHotWater, setIsHotWater] = useState(false);
+  const [isIndoor, setIsIndoor] = useState(false);
+
+  // 현재 줌과 좌표를 저장해둘 상태 (필터 변경 시 재사용)
+  const [currentLimit, setcurrentLimit] = useState(10);
+  const [currentRegion, setcurrentRegion] = useState(INITIAL_COORD);
+
   // 세차장 데이터 로드 함수
   const loadWashes = async () => {
     try {
@@ -84,37 +92,23 @@ const HomeScreen = () => {
 
   // 2. useEffect에서 전체 로드 대신 '주변 로드' 호출
   useEffect(() => {
-    // 1. 화면 전환 시 무조건 입력창 비우기
-    setEmail('');
-    setPassword('');
-    setCarNumber('');
-    setCarType('승용');
-    setLoading(false);
-
-    // 2. 만약 지도로 넘어온 경우라면 세차장 데이터 로드
+    // 지도가 켜져 있을 때만 데이터를 가져옵니다.
     if (currentScreen === 'MAP') {
-      fetchNearbyWashes(INITIAL_COORD.latitude, INITIAL_COORD.longitude);
+      fetchNearbyWashes();
     }
-  }, [currentScreen]);
+    // 의존성 배열에 모든 상태를 넣어줍니다. 
+    // 하나라도 바뀌면 fetchNearbyWashes가 최신 상태를 들고 서버로 갑니다.
+  }, [currentRegion, currentLimit, isHotWater, isIndoor, currentScreen]);
 
   // --- 1. 로그인 로직 ---
   const handleLogin = async () => {
     if (!email || !password) return Alert.alert('알림', '정보를 입력해주세요.');
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
       
-      if (error) {
-        console.error("로그인 상세 에러:", error.message); // 터미널에서 확인용
-        throw error;
-      }
-      
-      // 로그인 성공 시 지도로 이동
-      await loadWashes();
-      await fetchNearbyWashes(INITIAL_COORD.latitude, INITIAL_COORD.longitude);
+      // ★ 화면만 바꿔주면 useEffect의 [currentScreen] 감지 로직에 의해 첫 데이터가 로드됩니다.
       setCurrentScreen('MAP');
     } catch (e: any) {
       Alert.alert('로그인 실패', e.message);
@@ -153,15 +147,15 @@ const HomeScreen = () => {
   };
 
   // 주변 세차장 데이터를 가져오는 함수
-  const fetchNearbyWashes = async (lat: number, lng: number, limit: number = 10) => {
+  const fetchNearbyWashes = async () => {
     try {
       // RPC 함수 호출 시 search_limit을 함께 보냅니다.
       const { data, error } = await supabase.rpc('get_nearby_washes', {
-        user_lat: lat,
-        user_lng: lng,
-        search_limit: limit,  // * 줌 레벨에 따라 변하는 숫자
-        is_hotwater: false,   // (Step 4에서 상태값을 관리할 예정입니다)
-        is_indoor: false
+        user_lat: currentRegion.latitude,
+        user_lng: currentRegion.longitude,
+        search_limit: currentLimit,
+        is_hotwater: isHotWater, // 현재 State를 직접 참조
+        is_indoor: isIndoor
       });
       if (error) throw error;
       if (data) {
@@ -234,26 +228,19 @@ const HomeScreen = () => {
           longitude: INITIAL_COORD.longitude, 
           zoom: 15
         }}
+        // [지도 조작 시]
         onCameraChanged={(e) => {
           const { latitude, longitude, zoom = 15 } = e;
-
-          // zoom 레벨에 따른 마커 개수 분기
           let markerLimit = 10;
 
-          if (zoom >= 16) {
-            markerLimit = 5;  // 아주 가까움: 정밀하게 5개만
-          } else if (zoom >= 14) {
-            markerLimit = 15;  // 아주 가까움: 정밀하게 5개만
-          } else if (zoom >= 12) {
-            markerLimit = 30;  // 아주 가까움: 정밀하게 5개만
-          } else {
-            markerLimit = 50;  // 아주 가까움: 정밀하게 5개만
-          }
+          if (zoom >= 16) markerLimit = 5;
+          else if (zoom >= 14) markerLimit = 15;
+          else if (zoom >= 12) markerLimit = 30;
+          else markerLimit = 50;
 
-          console.log(`현재 줌: ${zoom.toFixed(1)}, 요청 개수: ${markerLimit}개`);
-
-          // 결정된 개수로 데이터 요청
-          fetchNearbyWashes(latitude, longitude, markerLimit);
+          // ★ 상태만 업데이트하면 위의 useEffect가 알아서 fetchNearbyWashes를 실행합니다.
+          setcurrentRegion({ latitude, longitude });
+          setcurrentLimit(markerLimit);
         }}
       >
         {/* 마커들은 그대로 둡니다 */}
@@ -293,21 +280,28 @@ const HomeScreen = () => {
           style={styles.filtersScroll}
         >
           {FILTERS.map((f) => {
-            const active = f.active;
+            // [A] 현재 상태값(isHotWater, isIndoor)과 매칭
+            const isActive =
+              (f.key === 'hotwater' && isHotWater) ||
+              (f.key === 'indoor' && isIndoor);
+              
             return (
               <Pressable
-                onPress={() => Alert.alert('알림', `${f.key} 버튼 클릭됨.`)}
                 key={f.key}
+                onPress={() => {
+                  if (f.key === 'hotwater') setIsHotWater(!isHotWater);
+                if (f.key === 'indoor') setIsIndoor(!isIndoor);
+                }}
                 style={[
                   styles.chip,
                   {
-                    backgroundColor: active ? colors.primary : colors.panel,
-                    borderColor: active ? 'transparent' : colors.panelBorder,
+                    backgroundColor: isActive ? colors.primary : colors.panel,
+                    borderColor: isActive ? 'transparent' : colors.panelBorder,
                   },
                 ]}
               >
-                <MaterialIcons name={f.icon as any} size={18} color={active ? '#fff' : colors.muted} />
-                <Text style={[styles.chipText, { color: active ? '#fff' : colors.muted }]}>{f.label}</Text>
+                <MaterialIcons name={f.icon as any} size={18} color={isActive ? '#fff' : colors.muted} />
+                <Text style={[styles.chipText, { color: isActive ? '#fff' : colors.muted }]}>{f.label}</Text>
               </Pressable>
             );
           })}
@@ -394,9 +388,13 @@ const styles = StyleSheet.create({
   },
 
   topOverlay: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 10,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 0, // 컨테이너 패딩은 0으로! (안의 ScrollView가 패딩을 가집니다)
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    zIndex: 10,
   },
   searchOuter: { alignItems: 'center' },
   search: {
@@ -426,11 +424,13 @@ const styles = StyleSheet.create({
 
   filtersScroll: {
     marginTop: 4,
+    width: '100%', // ★ 화면 끝까지 영역을 확보합니다.
   },
   filters: {
-    paddingHorizontal: 2,
+    paddingHorizontal: 16, // 좌우 시작과 끝에 16씩 여백
+    paddingRight: 32,      // ★ 마지막 버튼 뒤에 좀 더 넉넉한 공간을 줍니다.
     gap: 10,
-    paddingBottom: 4,
+    paddingBottom: 8,      // 그림자가 잘리지 않게 아래쪽도 살짝 여유를 줍니다.
   },
   chip: {
     flexDirection: 'row',
