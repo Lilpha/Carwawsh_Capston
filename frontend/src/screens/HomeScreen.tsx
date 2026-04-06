@@ -147,15 +147,23 @@ const HomeScreen = () => {
   };
 
   // 주변 세차장 데이터를 가져오는 함수
-  const fetchNearbyWashes = async () => {
+  const fetchNearbyWashes = async () => { // 1. 입구는 비어있지만
+    console.log('--- [서버 요청 데이터 패키지] ---');
+    console.log({
+      위도: currentRegion.latitude,
+      경도: currentRegion.longitude,
+      개수제한: currentLimit,
+      온수필터: isHotWater,
+      실내필터: isIndoor
+    });
     try {
-      // RPC 함수 호출 시 search_limit을 함께 보냅니다.
       const { data, error } = await supabase.rpc('get_nearby_washes', {
-        user_lat: currentRegion.latitude,
-        user_lng: currentRegion.longitude,
-        search_limit: currentLimit,
-        is_hotwater: isHotWater, // 현재 State를 직접 참조
-        is_indoor: isIndoor
+        // 2. 여기서 '상태(State)'들을 하나의 { 객체 }로 합칩니다!
+        user_lat: currentRegion.latitude,     // 현재 위도
+        user_lng: currentRegion.longitude,    // 현재 경도
+        search_limit: currentLimit,           // 현재 줌 레벨 기반 개수
+        is_hotwater: isHotWater,              // 현재 온수 필터 상태
+        is_indoor: isIndoor                   // 현재 실내 필터 상태
       });
       if (error) throw error;
       if (data) {
@@ -165,6 +173,7 @@ const HomeScreen = () => {
           longitude: Number(w.longitude),
         })));
       }
+      console.log()
     } catch (e: any) {
       console.error('검색 실패:', e.message);
     }
@@ -237,6 +246,8 @@ const HomeScreen = () => {
           else if (zoom >= 14) markerLimit = 15;
           else if (zoom >= 12) markerLimit = 30;
           else markerLimit = 50;
+
+          console.log(`[지도 조작] 줌: ${zoom.toFixed(1)} -> 결정된 마커 제한: ${markerLimit}개`);
 
           // ★ 상태만 업데이트하면 위의 useEffect가 알아서 fetchNearbyWashes를 실행합니다.
           setcurrentRegion({ latitude, longitude });
