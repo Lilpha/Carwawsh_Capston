@@ -5,6 +5,8 @@ import TabNavigator from './src/navigation/TabNavigator';
 import type { RootStackParamList } from './src/navigation/types';
 import ListScreen from './src/screens/ListScreen';
 import SearchScreen from './src/screens/SearchScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import SignupScreen from './src/screens/SignupScreen';
 
 export type { RootStackParamList };
 
@@ -13,7 +15,19 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="MainTabs">
+      <Stack.Navigator initialRouteName="Login">
+        {/* 신규: 로그인 및 회원가입 인증 흐름 */}
+        <Stack.Screen 
+          name="Login" 
+          component={LoginScreen} 
+          options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
+          name="Signup" 
+          component={SignupScreen} 
+          options={{ headerShown: false }} 
+        />
+        
         {/* 기존: 기본 하단 탭 (지도, 히스토리 등 포함) */}
         <Stack.Screen 
           name="MainTabs" 
