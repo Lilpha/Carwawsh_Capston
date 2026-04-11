@@ -85,7 +85,7 @@ const HomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { registerGoToLogin } = useLoginRedirect();
 
-  const [currentScreen, setCurrentScreen] = useState('LOGIN');
+  const [currentScreen, setCurrentScreen] = useState('MAP');
   const [loading, setLoading] = useState(false);
   const [washes, setWashes] = useState<Wash[]>([]);
   const [selectedFacilityFilters, setSelectedFacilityFilters] = useState<
