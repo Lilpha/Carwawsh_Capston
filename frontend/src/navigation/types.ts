@@ -5,3 +5,9 @@ export type RootStackParamList = {
   List: undefined;
   Search: undefined;
 };
+
+export type MainTabParamList = {
+  Map: undefined;
+  Saved: undefined;
+  Profile: undefined;
+};

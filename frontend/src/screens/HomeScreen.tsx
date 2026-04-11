@@ -1,27 +1,33 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  SafeAreaView, StyleSheet, TextInput, TouchableOpacity, Text, View, Alert, ActivityIndicator, 
+﻿import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import {
+  SafeAreaView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  Text,
+  View,
+  Alert,
+  ActivityIndicator,
   ScrollView,
   Pressable,
   Platform,
-  Modal,
+  Animated,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { Picker } from '@react-native-picker/picker';
-import { NaverMapView, NaverMapMarkerOverlay } from '@mj-studio/react-native-naver-map';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
+import { useLoginRedirect } from '../navigation/LoginRedirectContext';
 import {
   MAP_FACILITY_FILTER_OPTIONS,
   type MapFacilityFilterKey,
 } from '../lib/map-facility-filters';
 
-const INITIAL_COORD = { latitude: 37.5665, longitude: 126.9780 };
+import MapScreen from './MapScreen';
 
-// 고정된 테마 색상 (App.tsx용 라이트모드 기준)
 const colors = {
   primary: '#5a58e9',
   bg: '#ffffff',
@@ -41,12 +47,10 @@ type Wash = {
   address: string;
   status: string;
   hasHeatedWater?: boolean;
-  /** shops 연동 시 camelCase 또는 has_indoor_bay 등으로 올 수 있음 */
   hasIndoorBay?: boolean;
   hasEvCharging?: boolean;
 };
 
-/** Supabase/스프레드 row의 불리언·null·문자열·snake_case 대응 */
 function isTruthyFacilityFlag(value: unknown): boolean {
   if (value === true || value === 1) return true;
   if (value === false || value === 0 || value === null || value === undefined) return false;
@@ -79,28 +83,48 @@ function washMatchesFacilityFilters(
 
 const HomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { registerGoToLogin } = useLoginRedirect();
 
-  // Temporary test mode: bypass Firebase auth and land on map screen first.
-  //이 부분이 초기 시작화면을 결정하는 부분인데, firebase auth 문제로
-  // 기존 LOGIN으로 시작하던 것을 MAP으로 바꿔서 바로 지도 화면이 나오도록 했습니다.
-  //이후 로그인/회원가입 기능이 supabase 기반으로 완성되면 다시 LOGIN으로 바꿔주세요.
-  const [currentScreen, setCurrentScreen] = useState('MAP'); // LOGIN, SIGNUP, MAP
+  const [currentScreen, setCurrentScreen] = useState('LOGIN');
   const [loading, setLoading] = useState(false);
   const [washes, setWashes] = useState<Wash[]>([]);
-  /** 선택된 시설 필터. 비어 있으면 필터 미적용(전체). 데이터 연동 시 이 Set을 쿼리 조건으로 넘기면 됩니다. */
   const [selectedFacilityFilters, setSelectedFacilityFilters] = useState<
     Set<MapFacilityFilterKey>
   >(() => new Set());
-  /** 지도 마커 탭 시 표시할 세차장 (develop_log: 모달/바텀시트 패턴, 네비 구조 변경 없음) */
-  const [selectedWash, setSelectedWash] = useState<Wash | null>(null);
-  
-  // 가입/로그인용 공통 상태
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [carNumber, setCarNumber] = useState('');
   const [carType, setCarType] = useState('승용');
 
-  // 세차장 데이터 로드 함수
+  const [mapSheetIndex, setMapSheetIndex] = useState(-1);
+  const bottomBarOpacity = useRef(new Animated.Value(1)).current;
+  const topSearchOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.timing(bottomBarOpacity, {
+      toValue: mapSheetIndex >= 0 ? 0 : 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [mapSheetIndex, bottomBarOpacity]);
+
+  useEffect(() => {
+    Animated.timing(topSearchOpacity, {
+      toValue: mapSheetIndex === 1 ? 0 : 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [mapSheetIndex, topSearchOpacity]);
+
+  useFocusEffect(
+    useCallback(() => {
+      registerGoToLogin(() => {
+        setCurrentScreen('LOGIN');
+      });
+    }, [registerGoToLogin]),
+  );
+
   const loadWashes = async () => {
     try {
       const { data, error } = await supabase.from('shops').select('*');
@@ -111,7 +135,7 @@ const HomeScreen = () => {
             ...wash,
             latitude: Number(wash.latitude),
             longitude: Number(wash.longitude),
-          }))
+          })),
         );
       }
     } catch (e: any) {
@@ -132,7 +156,6 @@ const HomeScreen = () => {
     );
   }, [washes, selectedFacilityFilters]);
 
-  // --- 1. 로그인 로직 ---
   const handleLogin = async () => {
     if (!email || !password) return Alert.alert('알림', '정보를 입력해주세요.');
     setLoading(true);
@@ -142,15 +165,16 @@ const HomeScreen = () => {
         password,
       });
       if (error) throw error;
-      
+
       await loadWashes();
       setCurrentScreen('MAP');
     } catch (e: any) {
       Alert.alert('로그인 실패', '이메일 또는 비밀번호를 확인하세요.');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // --- 2. 회원가입 로직 ---
   const handleSignUp = async () => {
     if (!email || !password || !carNumber) return Alert.alert('알림', '모든 정보를 입력해주세요.');
     setLoading(true);
@@ -160,30 +184,74 @@ const HomeScreen = () => {
         password,
       });
       if (signUpError) throw signUpError;
-      
+
       const { error: updateError } = await supabase
         .from('users')
         .update({ car_number: carNumber, car_type: carType })
         .eq('id', data.user?.id);
-        
+
       if (updateError) throw updateError;
-      
+
       Alert.alert('성공', '회원가입 완료! 로그인을 진행해주세요.');
       setCurrentScreen('LOGIN');
     } catch (e: any) {
       Alert.alert('가입 에러', e.message);
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // --- 3. 로그아웃 로직 ---
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setCurrentScreen('LOGIN');
-  };
+  const topOverlayContent = (
+    <>
+      <View style={styles.searchOuter} pointerEvents="box-none">
+        <Pressable
+          onPress={() => navigation.getParent()?.navigate('Search')}
+          style={[
+            styles.search,
+            { backgroundColor: colors.panel, borderColor: colors.panelBorder, shadowColor: '#000' },
+          ]}
+        >
+          <MaterialIcons name="search" size={22} color={colors.primary} style={styles.searchIcon} />
+          <Text style={[styles.searchPlaceholder, { color: colors.muted }]}>세차장 이름·지역 검색</Text>
+        </Pressable>
+      </View>
 
-  // --- 화면 분기 렌더링 ---
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filters}
+        style={styles.filtersScroll}
+      >
+        {MAP_FACILITY_FILTER_OPTIONS.map((f) => {
+          const active = selectedFacilityFilters.has(f.key);
+          return (
+            <Pressable
+              key={f.key}
+              onPress={() => {
+                setSelectedFacilityFilters((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(f.key)) next.delete(f.key);
+                  else next.add(f.key);
+                  return next;
+                });
+              }}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: active ? colors.primary : colors.panel,
+                  borderColor: active ? 'transparent' : colors.panelBorder,
+                },
+              ]}
+            >
+              <MaterialIcons name={f.icon} size={18} color={active ? '#fff' : colors.muted} />
+              <Text style={[styles.chipText, { color: active ? '#fff' : colors.muted }]}>{f.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </>
+  );
 
-  // [A] 로그인 화면
   if (currentScreen === 'LOGIN') {
     return (
       <SafeAreaView style={styles.container}>
@@ -203,7 +271,6 @@ const HomeScreen = () => {
     );
   }
 
-  // [B] 회원가입 화면
   if (currentScreen === 'SIGNUP') {
     return (
       <SafeAreaView style={styles.container}>
@@ -229,196 +296,58 @@ const HomeScreen = () => {
     );
   }
 
-  // [C] 지도 화면 (Step 3 결과물)
   return (
     <View style={styles.mapContainer}>
-      <NaverMapView
-        style={StyleSheet.absoluteFill}
-        initialCamera={{
-          ...INITIAL_COORD,
-          zoom: 14,
-        }}
+      <MapScreen visibleWashes={visibleWashes} onSheetIndexChange={setMapSheetIndex} />
+
+      <Animated.View
+        style={[styles.topOverlayWrap, { opacity: topSearchOpacity }]}
+        pointerEvents={mapSheetIndex === 1 ? 'none' : 'box-none'}
       >
-        {visibleWashes.map((wash) => (
-          //미카 셍성 내용.
-          //https://rnnavermap.mjstudio.net/docs/components/naver-map-view
-          <NaverMapMarkerOverlay
-            key={`wash-${wash.id}`}
-            latitude={wash.latitude}
-            longitude={wash.longitude}
-            image={{ symbol: wash.status === '동파' ? 'red' : 'green' }}
-            anchor={{ x: 0.5, y: 1 }}
-            caption={{ text: wash.name }}
-            onTap={() => setSelectedWash(wash)}
-          />
-        ))}
-      </NaverMapView>
+        <SafeAreaView style={styles.topOverlay} pointerEvents="box-none">
+          {topOverlayContent}
+        </SafeAreaView>
+      </Animated.View>
 
-      {/* 상단 레이아웃 */}
-      <SafeAreaView style={styles.topOverlay} pointerEvents="box-none">
-        {/* 검색창 */}
-        <View style={styles.searchOuter} pointerEvents="box-none">
-          <Pressable
-            onPress={() => navigation.getParent()?.navigate('Search')}
-            style={[
-              styles.search,
-              { backgroundColor: colors.panel, borderColor: colors.panelBorder, shadowColor: '#000' },
-            ]}
-          >
-            <MaterialIcons name="search" size={22} color={colors.primary} style={styles.searchIcon} />
-            <Text style={[styles.searchPlaceholder, { color: colors.muted }]}>세차장 이름·지역 검색</Text>
-          </Pressable>
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filters}
-          style={styles.filtersScroll}
-        >
-          {MAP_FACILITY_FILTER_OPTIONS.map((f) => {
-            const active = selectedFacilityFilters.has(f.key);
-            return (
-              <Pressable
-                key={f.key}
-                onPress={() => {
-                  setSelectedFacilityFilters((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(f.key)) next.delete(f.key);
-                    else next.add(f.key);
-                    return next;
-                  });
-                }}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: active ? colors.primary : colors.panel,
-                    borderColor: active ? 'transparent' : colors.panelBorder,
-                  },
-                ]}
-              >
-                <MaterialIcons name={f.icon} size={18} color={active ? '#fff' : colors.muted} />
-                <Text style={[styles.chipText, { color: active ? '#fff' : colors.muted }]}>{f.label}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </SafeAreaView>
-      {/* 상단 레이아웃 끝 */}
-      
-      {/* 하단 레이아웃 시작 */}
-      <View style={styles.bottomOverlay} pointerEvents="box-none">
-          <View style={styles.bottomActions}>
+      <Animated.View
+        style={[styles.bottomOverlay, { opacity: bottomBarOpacity }]}
+        pointerEvents={mapSheetIndex >= 0 ? 'none' : 'box-none'}
+      >
+        <View style={styles.bottomActions}>
+          <View style={styles.ctaRow}>
             <Pressable
+              onPress={() => navigation.getParent()?.navigate('List')}
               style={[
-                styles.squareButton,
+                styles.cta,
                 { backgroundColor: colors.panel, borderColor: colors.panelBorder, shadowColor: '#000' },
               ]}
             >
-              <MaterialIcons name="layers" size={22} color={colors.primary} />
+              <MaterialIcons name="list" size={20} color={colors.primary} />
+              <Text style={[styles.ctaText, { color: colors.text }]}>List View</Text>
             </Pressable>
-
-            <View style={styles.ctaRow}>
-              {/* 네비게이션 함수!! 이 버튼을 누르면 상위 파일은 App.tsx에 해당 이름인 List으로 선언되어 있는  component={ListScreen} 으로 이동하게 됩니다. 이 형태로 유지해주시면 될 것 같아요. */}
-              <Pressable
-                onPress={() => navigation.getParent()?.navigate('List')}
-                style={[
-                  styles.cta,
-                  { backgroundColor: colors.panel, borderColor: colors.panelBorder, shadowColor: '#000' },
-                ]}
-              >
-                <MaterialIcons name="list" size={20} color={colors.primary} />
-                <Text style={[styles.ctaText, { color: colors.text }]}>List View</Text>
-              </Pressable>
-              <Pressable 
+            <Pressable
               onPress={() => Alert.alert('알림', 'my location 버튼 클릭됨.')}
-              style={[styles.cta, { backgroundColor: colors.primary, borderColor: 'transparent' }]}>
-                <MaterialIcons name="near-me" size={20} color="#fff" />
-                <Text style={[styles.ctaText, { color: '#fff' }]}>My Location</Text>
-              </Pressable>
-            </View>
+              style={[styles.cta, { backgroundColor: colors.primary, borderColor: 'transparent' }]}
+            >
+              <MaterialIcons name="near-me" size={20} color="#fff" />
+              <Text style={[styles.ctaText, { color: '#fff' }]}>My Location</Text>
+            </Pressable>
           </View>
         </View>
-      {/* 하단 레이아웃 끝 */}
-      <Modal
-        visible={selectedWash !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedWash(null)}
-      >
-        <View style={styles.washDetailModalRoot}>
-          <Pressable
-            style={styles.washDetailBackdrop}
-            onPress={() => setSelectedWash(null)}
-            accessibilityRole="button"
-            accessibilityLabel="닫기"
-          />
-          {selectedWash ? (
-            <View style={[styles.washDetailSheet, { borderColor: colors.panelBorder }]}>
-              <View style={styles.washDetailSheetHeader}>
-                <Text style={[styles.washDetailTitle, { color: colors.text }]} numberOfLines={2}>
-                  {selectedWash.name}
-                </Text>
-                <Pressable
-                  onPress={() => setSelectedWash(null)}
-                  hitSlop={12}
-                  accessibilityRole="button"
-                  accessibilityLabel="상세 닫기"
-                >
-                  <MaterialIcons name="close" size={22} color={colors.muted} />
-                </Pressable>
-              </View>
-              <Text style={[styles.washDetailAddress, { color: colors.muted }]} numberOfLines={4}>
-                {selectedWash.address}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      </Modal>
-      <TouchableOpacity 
-      style={styles.logoutBtn}
-      onPress={handleLogout}>
-        <Text style={{ color: 'white', fontWeight: 'bold' }}>로그아웃</Text>
-      </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  //상단 메뉴 스타일
-    safe: { flex: 1 },
-  root: { flex: 1 },
-
-  markerWrap: {
+  mapContainer: { flex: 1 },
+  topOverlayWrap: {
     position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    zIndex: 6,
   },
-  markerInner: { alignItems: 'center' },
-  markerLabel: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 2,
-    ...Platform.select({
-      ios: {
-        shadowOpacity: 0.18,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 6 },
-      },
-      android: {
-        elevation: 6,
-      },
-    }),
-  },
-  markerLabelText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  markerPin: {
-    textShadowColor: 'rgba(0,0,0,0.20)',
-    textShadowRadius: 10,
-  },
-
   topOverlay: {
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -449,7 +378,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-
   filtersScroll: {
     marginTop: 4,
   },
@@ -479,31 +407,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-
   bottomOverlay: {
-    marginTop: 'auto',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 6,
   },
   bottomActions: {
     paddingHorizontal: 16,
     paddingBottom: 14,
     gap: 12,
-    alignItems: 'flex-end',
-  },
-  squareButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowOpacity: 0.16,
-        shadowRadius: 14,
-        shadowOffset: { width: 0, height: 8 },
-      },
-      android: { elevation: 7 },
-    }),
+    alignItems: 'stretch',
   },
   ctaRow: {
     width: '100%',
@@ -533,7 +448,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  //상단 메뉴 스타일  종료
   container: { flex: 1, backgroundColor: '#F5F5F5', justifyContent: 'center' },
   inner: { paddingHorizontal: 30 },
   title: { fontSize: 32, fontWeight: 'bold', textAlign: 'center', color: '#007AFF' },
@@ -543,53 +457,6 @@ const styles = StyleSheet.create({
   button: { backgroundColor: '#007AFF', padding: 15, borderRadius: 10, alignItems: 'center' },
   buttonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
   linkText: { textAlign: 'center', marginTop: 20, color: '#007AFF' },
-  mapContainer: { flex: 1 },
-  map: { width: '100%', height: '100%' },
-  washDetailModalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  washDetailBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-  },
-  washDetailSheet: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderTopWidth: 1,
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 28,
-    maxHeight: '40%',
-    ...Platform.select({
-      ios: {
-        shadowOpacity: 0.12,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: -4 },
-      },
-      android: { elevation: 12 },
-    }),
-  },
-  washDetailSheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 10,
-  },
-  washDetailTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  washDetailAddress: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '500',
-  },
-  logoutBtn: { position: 'absolute', bottom: 40, right: 20, backgroundColor: 'rgba(255,59,48,0.9)', padding: 15, borderRadius: 30 }
-  
 });
 
 export default HomeScreen;
