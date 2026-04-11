@@ -15,9 +15,10 @@ export type MapWashMarker = WashSheetWash & {
 export type MapScreenProps = {
   visibleWashes: MapWashMarker[];
   onSheetIndexChange?: (index: number) => void;
+  onCameraChanged?: (e: { latitude: number; longitude: number; zoom?: number }) => void;
 };
 
-export default function MapScreen({ visibleWashes, onSheetIndexChange }: MapScreenProps) {
+export default function MapScreen({ visibleWashes, onSheetIndexChange, onCameraChanged }: MapScreenProps) {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [sheetIndex, setSheetIndex] = useState(-1);
   const [selectedWash, setSelectedWash] = useState<MapWashMarker | null>(null);
@@ -55,6 +56,7 @@ export default function MapScreen({ visibleWashes, onSheetIndexChange }: MapScre
           ...INITIAL_COORD,
           zoom: 14,
         }}
+        onCameraChanged={onCameraChanged}
       >
         {visibleWashes.map((wash) => (
           <NaverMapMarkerOverlay

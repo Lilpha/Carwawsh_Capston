@@ -37,6 +37,9 @@ const colors = {
   mapFallback: '#E2E8F0',
 };
 
+// 1. 상단 INITIAL_COORD를 춘천(한림대)으로 통일
+const INITIAL_COORD = { latitude: 37.8865, longitude: 127.7385 };
+
 type Wash = {
   id: number;
   name: string;
@@ -88,6 +91,10 @@ const HomeScreen = () => {
   const [selectedFacilityFilters, setSelectedFacilityFilters] = useState<
     Set<MapFacilityFilterKey>
   >(() => new Set());
+  
+  // 현재 줌과 좌표를 저장해둘 상태 (필터 변경 시 재사용)
+  const [currentLimit, setCurrentLimit] = useState(10);
+  const [currentRegion, setCurrentRegion] = useState(INITIAL_COORD);
 
   const [mapSheetIndex, setMapSheetIndex] = useState(-1);
   const bottomBarOpacity = useRef(new Animated.Value(1)).current;
@@ -119,28 +126,49 @@ const HomeScreen = () => {
   //   }, [registerGoToLogin, navigation]),
   // );
 
-  const loadWashes = async () => {
+  // 주변 세차장 데이터를 가져오는 함수 (PostGIS 연동)
+  const fetchNearbyWashes = async () => {
+    const isHotWater = selectedFacilityFilters.has('hotwater');
+    const isIndoor = selectedFacilityFilters.has('indoor');
+
+    console.log('--- [서버 요청 데이터 패키지] ---');
+    console.log({
+      위도: currentRegion.latitude,
+      경도: currentRegion.longitude,
+      개수제한: currentLimit,
+      온수필터: isHotWater,
+      실내필터: isIndoor
+    });
+
     try {
-      const { data, error } = await supabase.from('shops').select('*');
+      const { data, error } = await supabase.rpc('get_nearby_washes', {
+        user_lat: currentRegion.latitude,
+        user_lng: currentRegion.longitude,
+        search_limit: currentLimit,
+        is_hotwater: isHotWater,
+        is_indoor: isIndoor
+      });
       if (error) throw error;
       if (data) {
         setWashes(
-          data.map((wash: any) => ({
-            ...wash,
-            latitude: Number(wash.latitude),
-            longitude: Number(wash.longitude),
+          data.map((w: any) => ({
+            ...w,
+            latitude: Number(w.latitude),
+            longitude: Number(w.longitude),
           })),
         );
       }
     } catch (e: any) {
-      console.error('데이터 로딩 에러:', e.message);
+      console.error('검색 실패:', e.message);
     }
   };
 
   useEffect(() => {
-    loadWashes();
-  }, []);
+    fetchNearbyWashes();
+  }, [currentRegion, currentLimit, selectedFacilityFilters]);
 
+  // 필터 버튼은 프론트엔드에서도 처리할 수 있지만
+  // 백엔드 요청이 이루어진 이후의 상태 배열(washes)을 그대로 사용할 수도 있습니다.
   const visibleWashes = useMemo(() => {
     if (selectedFacilityFilters.size === 0) return washes;
     return washes.filter((wash) =>
@@ -203,7 +231,24 @@ const HomeScreen = () => {
   
   return (
     <View style={styles.mapContainer}>
-      <MapScreen visibleWashes={visibleWashes} onSheetIndexChange={setMapSheetIndex} />
+      <MapScreen 
+        visibleWashes={visibleWashes} 
+        onSheetIndexChange={setMapSheetIndex} 
+        onCameraChanged={(e) => {
+          const { latitude, longitude, zoom = 15 } = e;
+          let markerLimit = 10;
+
+          if (zoom >= 16) markerLimit = 5;
+          else if (zoom >= 14) markerLimit = 15;
+          else if (zoom >= 12) markerLimit = 30;
+          else markerLimit = 50;
+
+          // console.log(`[지도 조작] 줌: ${zoom.toFixed(1)} -> 결정된 마커 제한: ${markerLimit}개`);
+
+          setCurrentRegion({ latitude, longitude });
+          setCurrentLimit(markerLimit);
+        }}
+      />
 
       <Animated.View
         style={[styles.topOverlayWrap, { opacity: topSearchOpacity }]}
