@@ -23,8 +23,19 @@ export default function App() {
         <NavigationContainer>
           <LoginRedirectProvider>
             <SavedShopsProvider>
-              <Stack.Navigator initialRouteName="MainTabs">
-                {/* 기존: 기본 하단 탭 (지도, 히스토리 등 포함) */}
+              <Stack.Navigator initialRouteName="Login">
+                {/* 신규: 로그인 및 회원가입 인증 흐름 */}
+                <Stack.Screen 
+                  name="Login" 
+                  component={LoginScreen} 
+                  options={{ headerShown: false }} 
+                />
+                
+                <Stack.Screen 
+                  name="Signup" 
+                  component={SignupScreen} 
+                  options={{ headerShown: false }} 
+                />
                 <Stack.Screen 
                   name="MainTabs" 
                   component={TabNavigator} 

@@ -38,8 +38,11 @@ export default function ProfileScreen() {
         onPress: async () => {
           try {
             await supabase.auth.signOut();
-            navigation.navigate('Map');
-            requestGoToLogin();
+            // 부모 스택(App.tsx)의 네비게이션을 찾아서 로그인 화면으로 스택 리셋
+            navigation.getParent()?.reset({
+              index: 0,
+              routes: [{ name: 'Login' }],
+            });
           } catch {
             Alert.alert('오류', '로그아웃에 실패했습니다.');
           }

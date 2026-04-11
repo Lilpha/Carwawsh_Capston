@@ -2,7 +2,6 @@
 import {
   SafeAreaView,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   Text,
   View,
@@ -14,7 +13,6 @@ import {
   Animated,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { Picker } from '@react-native-picker/picker';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -83,19 +81,13 @@ function washMatchesFacilityFilters(
 
 const HomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { registerGoToLogin } = useLoginRedirect();
+  // const { registerGoToLogin } = useLoginRedirect();
 
-  const [currentScreen, setCurrentScreen] = useState('MAP');
   const [loading, setLoading] = useState(false);
   const [washes, setWashes] = useState<Wash[]>([]);
   const [selectedFacilityFilters, setSelectedFacilityFilters] = useState<
     Set<MapFacilityFilterKey>
   >(() => new Set());
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [carNumber, setCarNumber] = useState('');
-  const [carType, setCarType] = useState('승용');
 
   const [mapSheetIndex, setMapSheetIndex] = useState(-1);
   const bottomBarOpacity = useRef(new Animated.Value(1)).current;
@@ -117,13 +109,15 @@ const HomeScreen = () => {
     }).start();
   }, [mapSheetIndex, topSearchOpacity]);
 
-  useFocusEffect(
-    useCallback(() => {
-      registerGoToLogin(() => {
-        setCurrentScreen('LOGIN');
-      });
-    }, [registerGoToLogin]),
-  );
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     registerGoToLogin(() => {
+  //       // setCurrentScreen('LOGIN');
+  //       // 글로벌 스택에 있는 Login 화면으로 리다이렉트
+  //       navigation.navigate('Login');
+  //     });
+  //   }, [registerGoToLogin, navigation]),
+  // );
 
   const loadWashes = async () => {
     try {
@@ -144,10 +138,8 @@ const HomeScreen = () => {
   };
 
   useEffect(() => {
-    if (currentScreen === 'MAP') {
-      loadWashes();
-    }
-  }, [currentScreen]);
+    loadWashes();
+  }, []);
 
   const visibleWashes = useMemo(() => {
     if (selectedFacilityFilters.size === 0) return washes;
@@ -155,51 +147,6 @@ const HomeScreen = () => {
       washMatchesFacilityFilters(wash as WashRow, selectedFacilityFilters),
     );
   }, [washes, selectedFacilityFilters]);
-
-  const handleLogin = async () => {
-    if (!email || !password) return Alert.alert('알림', '정보를 입력해주세요.');
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
-
-      await loadWashes();
-      setCurrentScreen('MAP');
-    } catch (e: any) {
-      Alert.alert('로그인 실패', '이메일 또는 비밀번호를 확인하세요.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignUp = async () => {
-    if (!email || !password || !carNumber) return Alert.alert('알림', '모든 정보를 입력해주세요.');
-    setLoading(true);
-    try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (signUpError) throw signUpError;
-
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ car_number: carNumber, car_type: carType })
-        .eq('id', data.user?.id);
-
-      if (updateError) throw updateError;
-
-      Alert.alert('성공', '회원가입 완료! 로그인을 진행해주세요.');
-      setCurrentScreen('LOGIN');
-    } catch (e: any) {
-      Alert.alert('가입 에러', e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const topOverlayContent = (
     <>
@@ -252,50 +199,8 @@ const HomeScreen = () => {
     </>
   );
 
-  if (currentScreen === 'LOGIN') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.inner}>
-          <Text style={styles.title}>Mapping</Text>
-          <Text style={styles.subtitle}>세차장 매칭 서비스</Text>
-          <TextInput style={styles.input} placeholder="이메일" value={email} onChangeText={setEmail} autoCapitalize="none" />
-          <TextInput style={styles.input} placeholder="비밀번호" value={password} onChangeText={setPassword} secureTextEntry />
-          <TouchableOpacity style={styles.button} onPress={handleLogin}>
-            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buttonText}>로그인</Text>}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setCurrentScreen('SIGNUP')}>
-            <Text style={styles.linkText}>계정이 없으신가요? 회원가입</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (currentScreen === 'SIGNUP') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.inner}>
-          <Text style={styles.title}>회원가입</Text>
-          <TextInput style={styles.input} placeholder="이메일" value={email} onChangeText={setEmail} autoCapitalize="none" />
-          <TextInput style={styles.input} placeholder="비밀번호" value={password} onChangeText={setPassword} secureTextEntry />
-          <TextInput style={styles.input} placeholder="차량 번호" value={carNumber} onChangeText={setCarNumber} />
-          <View style={styles.pickerContainer}>
-            <Picker selectedValue={carType} onValueChange={(v) => setCarType(v)}>
-              <Picker.Item label="일반 승용차" value="승용" />
-              <Picker.Item label="SUV / 대형차" value="SUV" />
-            </Picker>
-          </View>
-          <TouchableOpacity style={styles.button} onPress={handleSignUp}>
-            <Text style={styles.buttonText}>가입 완료</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setCurrentScreen('LOGIN')}>
-            <Text style={styles.linkText}>이미 계정이 있나요? 로그인</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
+  // 불필요했던 로그인/회원가입 조건부 렌더링 제거 완료
+  
   return (
     <View style={styles.mapContainer}>
       <MapScreen visibleWashes={visibleWashes} onSheetIndexChange={setMapSheetIndex} />
@@ -448,15 +353,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  container: { flex: 1, backgroundColor: '#F5F5F5', justifyContent: 'center' },
-  inner: { paddingHorizontal: 30 },
-  title: { fontSize: 32, fontWeight: 'bold', textAlign: 'center', color: '#007AFF' },
-  subtitle: { fontSize: 16, textAlign: 'center', marginBottom: 30, color: '#666' },
-  input: { backgroundColor: '#FFF', padding: 15, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#DDD' },
-  pickerContainer: { backgroundColor: '#FFF', borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#DDD' },
-  button: { backgroundColor: '#007AFF', padding: 15, borderRadius: 10, alignItems: 'center' },
-  buttonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  linkText: { textAlign: 'center', marginTop: 20, color: '#007AFF' },
 });
 
 export default HomeScreen;
