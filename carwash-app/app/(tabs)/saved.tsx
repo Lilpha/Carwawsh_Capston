@@ -18,8 +18,8 @@ export default function SavedScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      <Text style={[styles.title, { color: colors.text }]}>Saved Places</Text>
-      <Text style={[styles.subtitle, { color: colors.muted }]}>즐겨찾기한 세차장</Text>
+      <Text style={[styles.title, { color: colors.text }]}>저장한 세차장</Text>
+      <Text style={[styles.subtitle, { color: colors.muted }]}>나중에 다시 보기 좋은 곳을 모아둡니다. (샘플)</Text>
 
       {['EcoWash', 'QuickShine'].map((name) => (
         <Pressable

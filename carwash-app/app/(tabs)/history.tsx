@@ -17,18 +17,20 @@ export default function HistoryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      <Text style={[styles.title, { color: colors.text }]}>Recent History</Text>
-      <Text style={[styles.subtitle, { color: colors.muted }]}>최근 이용한 세차장 기록</Text>
+      <Text style={[styles.title, { color: colors.text }]}>최근 조회</Text>
+      <Text style={[styles.subtitle, { color: colors.muted }]}>
+        앱에서 상세 화면을 열어본 기록입니다. (샘플 데이터)
+      </Text>
 
       {[
-        { name: 'EcoWash', date: '오늘 14:20', amount: '8,000원' },
-        { name: 'QuickShine', date: '어제 09:40', amount: '12,000원' },
-        { name: 'FlashClean', date: '3일 전 18:10', amount: '6,000원' },
+        { name: 'EcoWash', date: '오늘 14:20' },
+        { name: 'QuickShine', date: '어제 09:40' },
+        { name: 'FlashClean', date: '3일 전 18:10' },
       ].map((item) => (
         <View key={`${item.name}-${item.date}`} style={[styles.card, { backgroundColor: colors.panel, borderColor: colors.border }]}>
           <View style={styles.rowBetween}>
             <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
-            <Text style={[styles.amount, { color: colors.primary }]}>{item.amount}</Text>
+            <Text style={[styles.badge, { color: colors.primary }]}>열람</Text>
           </View>
           <View style={styles.row}>
             <MaterialIcons name="schedule" size={14} color={colors.muted} />
@@ -49,6 +51,6 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardTitle: { fontSize: 16, fontWeight: '800' },
   meta: { fontSize: 12, fontWeight: '600' },
-  amount: { fontSize: 14, fontWeight: '900' },
+  badge: { fontSize: 12, fontWeight: '900' },
 });
 

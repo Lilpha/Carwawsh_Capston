@@ -13,7 +13,7 @@ type Carwash = {
   distanceKm: number;
   rating: number;
   reviewCount: number;
-  tags: ('hotwater' | 'indoor' | 'ev' | 'card')[];
+  tags: ('hotwater' | 'indoor' | 'self' | 'night')[];
   busy: 'low' | 'medium' | 'high';
 };
 
@@ -25,7 +25,7 @@ const CARWASHES: Carwash[] = [
     distanceKm: 0.8,
     rating: 4.8,
     reviewCount: 124,
-    tags: ['hotwater', 'card'],
+    tags: ['hotwater', 'self'],
     busy: 'medium',
   },
   {
@@ -35,7 +35,7 @@ const CARWASHES: Carwash[] = [
     distanceKm: 1.4,
     rating: 4.6,
     reviewCount: 86,
-    tags: ['indoor', 'ev', 'card'],
+    tags: ['indoor', 'night'],
     busy: 'low',
   },
   {
@@ -55,17 +55,17 @@ const TAGS: {
   label: string;
   icon: React.ComponentProps<typeof MaterialIcons>['name'];
 }[] = [
-    { key: 'hotwater', label: 'Hot Water', icon: 'ac-unit' },
-    { key: 'indoor', label: 'Indoor Bay', icon: 'home' },
-    { key: 'ev', label: 'EV Charging', icon: 'bolt' },
-    { key: 'card', label: 'Card Payment', icon: 'credit-card' },
+    { key: 'hotwater', label: '온수', icon: 'ac-unit' },
+    { key: 'indoor', label: '실내 베이', icon: 'home' },
+    { key: 'self', label: '셀프 세차', icon: 'local-car-wash' },
+    { key: 'night', label: '야간 운영', icon: 'nights-stay' },
   ];
 
 export default function ExploreListScreen() {
   const scheme = useColorScheme() ?? 'light';
   const isDark = scheme === 'dark';
   const [query, setQuery] = useState('');
-  const [selectedTags, setSelectedTags] = useState<Set<Carwash['tags'][number]>>(new Set(['hotwater']));
+  const [selectedTags, setSelectedTags] = useState<Set<Carwash['tags'][number]>>(new Set());
 
   const colors = useMemo(
     () => ({
@@ -98,7 +98,7 @@ export default function ExploreListScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <MaterialIcons name="arrow-back" size={22} color={colors.text} />
         </Pressable>
-        <Text style={[styles.title, { color: colors.text }]}>List View</Text>
+        <Text style={[styles.title, { color: colors.text }]}>목록으로 보기</Text>
         <View style={{ width: 34 }} />
       </View>
 
@@ -108,7 +108,7 @@ export default function ExploreListScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search carwashes"
+            placeholder="세차장 검색"
             placeholderTextColor={colors.muted}
             style={[styles.searchInput, { color: colors.text }]}
             returnKeyType="search"
@@ -194,9 +194,9 @@ export default function ExploreListScreen() {
                       ? '온수'
                       : t === 'indoor'
                         ? '실내'
-                        : t === 'ev'
-                          ? 'EV'
-                          : '카드'}
+                        : t === 'self'
+                          ? '셀프'
+                          : '야간'}
                   </Text>
                 </View>
               ))}

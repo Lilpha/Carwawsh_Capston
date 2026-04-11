@@ -2,12 +2,12 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
+import type { MainTabParamList } from './types';
 import HomeScreen from '../screens/HomeScreen';
-import HistoryScreen from '../screens/HistoryScreen';
 import SavedScreen from '../screens/SavedScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export default function TabNavigator() {
   return (
@@ -16,7 +16,6 @@ export default function TabNavigator() {
         tabBarIcon: ({ color, size }) => {
           let iconName = '';
           if (route.name === 'Map') iconName = 'map';
-          else if (route.name === 'History') iconName = 'history';
           else if (route.name === 'Saved') iconName = 'bookmark';
           else if (route.name === 'Profile') iconName = 'person';
           
@@ -28,7 +27,6 @@ export default function TabNavigator() {
       })}
     >
       <Tab.Screen name="Map" component={HomeScreen} options={{ tabBarLabel: '지도' }} />
-      <Tab.Screen name="History" component={HistoryScreen} options={{ tabBarLabel: '기록' }} />
       <Tab.Screen name="Saved" component={SavedScreen} options={{ tabBarLabel: '저장' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: '프로필' }} />
     </Tab.Navigator>

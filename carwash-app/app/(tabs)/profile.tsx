@@ -29,14 +29,14 @@ export default function ProfileScreen() {
       </View>
 
       {[
-        { label: '내 차량 관리', icon: 'directions-car' },
+        { label: '차량 메모', icon: 'directions-car' },
         { label: '알림 설정', icon: 'notifications' },
         { label: '문의하기', icon: 'support-agent' },
       ].map((item) => (
         <Pressable
           key={item.label}
           onPress={() => {
-            if (item.label === '내 차량 관리') {
+            if (item.label === '차량 메모') {
               router.push('/vehicles');
             }
           }}
