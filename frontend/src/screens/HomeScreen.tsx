@@ -24,7 +24,8 @@ import {
   type MapFacilityFilterKey,
 } from '../lib/map-facility-filters';
 
-import MapScreen from './MapScreen';
+// 1. 상단 INITIAL_COORD를 춘천(한림대)으로 통일
+const INITIAL_COORD = { latitude: 37.8865, longitude: 127.7385 };
 
 const colors = {
   primary: '#5a58e9',
@@ -163,18 +164,44 @@ const HomeScreen = () => {
     }
   };
 
+  // 2. useEffect에서 전체 로드 대신 '주변 로드' 호출
   useEffect(() => {
-    fetchNearbyWashes();
-  }, [currentRegion, currentLimit, selectedFacilityFilters]);
+    // 1. 화면 전환 시 무조건 입력창 비우기
+    setEmail('');
+    setPassword('');
+    setCarNumber('');
+    setCarType('승용');
+    setLoading(false);
 
-  // 필터 버튼은 프론트엔드에서도 처리할 수 있지만
-  // 백엔드 요청이 이루어진 이후의 상태 배열(washes)을 그대로 사용할 수도 있습니다.
-  const visibleWashes = useMemo(() => {
-    if (selectedFacilityFilters.size === 0) return washes;
-    return washes.filter((wash) =>
-      washMatchesFacilityFilters(wash as WashRow, selectedFacilityFilters),
-    );
-  }, [washes, selectedFacilityFilters]);
+    // 2. 만약 지도로 넘어온 경우라면 세차장 데이터 로드
+    if (currentScreen === 'MAP') {
+      fetchNearbyWashes(INITIAL_COORD.latitude, INITIAL_COORD.longitude);
+    }
+  }, [currentScreen]);
+
+  // --- 1. 로그인 로직 ---
+  const handleLogin = async () => {
+    if (!email || !password) return Alert.alert('알림', '정보를 입력해주세요.');
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) {
+        console.error("로그인 상세 에러:", error.message); // 터미널에서 확인용
+        throw error;
+      }
+      
+      // 로그인 성공 시 지도로 이동
+      await loadWashes();
+      await fetchNearbyWashes(INITIAL_COORD.latitude, INITIAL_COORD.longitude);
+      setCurrentScreen('MAP');
+    } catch (e: any) {
+      Alert.alert('로그인 실패', e.message);
+    } finally { setLoading(false); }
+  };
 
   const topOverlayContent = (
     <>
@@ -227,16 +254,27 @@ const HomeScreen = () => {
     </>
   );
 
-  // 불필요했던 로그인/회원가입 조건부 렌더링 제거 완료
-  
-  return (
-    <View style={styles.mapContainer}>
-      <MapScreen 
-        visibleWashes={visibleWashes} 
-        onSheetIndexChange={setMapSheetIndex} 
-        onCameraChanged={(e) => {
-          const { latitude, longitude, zoom = 15 } = e;
-          let markerLimit = 10;
+  // 주변 세차장 데이터를 가져오는 함수
+  const fetchNearbyWashes = async (lat: number, lng: number) => {
+    try {
+      const { data, error } = await supabase.rpc('get_nearby_washes', {
+        user_lat: lat,
+        user_lng: lng
+      });
+      if (error) throw error;
+      if (data) {
+        setWashes(data.map((w: any) => ({
+          ...w,
+          latitude: Number(w.latitude),
+          longitude: Number(w.longitude),
+        })));
+      }
+    } catch (e: any) {
+      console.error('검색 실패:', e.message);
+    }
+  };
+
+  // --- 화면 분기 렌더링 ---
 
           if (zoom >= 16) markerLimit = 5;
           else if (zoom >= 14) markerLimit = 15;
@@ -245,10 +283,32 @@ const HomeScreen = () => {
 
           // console.log(`[지도 조작] 줌: ${zoom.toFixed(1)} -> 결정된 마커 제한: ${markerLimit}개`);
 
-          setCurrentRegion({ latitude, longitude });
-          setCurrentLimit(markerLimit);
+  // [C] 지도 화면 (Step 3 결과물)
+  return (
+    <View style={styles.mapContainer}>
+      <NaverMapView
+        style={styles.map}
+        initialCamera={{ 
+          latitude: INITIAL_COORD.latitude, 
+          longitude: INITIAL_COORD.longitude, 
+          zoom: 15 
         }}
-      />
+        onCameraChanged={(e) => {
+          fetchNearbyWashes(e.latitude, e.longitude);
+        }}
+      >
+        {/* 마커들은 그대로 둡니다 */}
+        {washes.map((wash) => (
+          <NaverMapMarkerOverlay
+            key={`wash-${wash.id}`}
+            latitude={wash.latitude}
+            longitude={wash.longitude}
+            image={{ symbol: wash.status === '동파' ? 'red' : 'green' }}
+            caption={{ text: wash.name }}
+            onTap={() => Alert.alert(wash.name, `${wash.address}\n상태: ${wash.status}`)}
+          />
+        ))}
+      </NaverMapView>
 
       <Animated.View
         style={[styles.topOverlayWrap, { opacity: topSearchOpacity }]}

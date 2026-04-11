@@ -1,13 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
+// @ts-ignore (이름에서 EXPO_PUBLIC_을 빼주세요!)
 import { EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY } from '@env';
 
-const supabaseUrl = (EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
-const supabaseAnonKey = (EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+// 터미널에 주소가 찍히는지 확인 (undefined가 나오면 안 됩니다)
+console.log("📍 연결 주소 확인:", EXPO_PUBLIC_SUPABASE_URL);
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Supabase URL/키가 없습니다. frontend 폴더에 .env 파일을 만들고 EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY 를 설정하세요. (.env.example 참고) 저장 후 Metro를 --reset-cache 로 다시 실행하세요.',
-  );
+if (!EXPO_PUBLIC_SUPABASE_URL || !EXPO_PUBLIC_SUPABASE_ANON_KEY) {
+  throw new Error("환경 변수 로드 실패! 이름을 확인하세요.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY);

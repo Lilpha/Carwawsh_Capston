@@ -74,16 +74,17 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 android {
     buildToolsVersion rootProject.ext.buildToolsVersion
-    compileSdk rootProject.ext.compileSdkVersion
+    compileSdk 36 
 
     namespace "com.mapping"
     defaultConfig {
         applicationId "com.mapping"
         minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
+        targetSdkVersion 36 
+        
         versionCode 1
         versionName "1.0"
-        //이 부분에 네이버 맵 API 키를 넣어주세요.  local.properties 파일에 키를 추가하거나, 직접 오른쪽에 하드코딩 하면 됩니다.
+        
         manifestPlaceholders = [
             NAVER_MAP_NCP_KEY_ID: project.findProperty("NAVER_MAP_NCP_KEY_ID") ?: "",
             NAVER_MAP_CLIENT_ID: project.findProperty("NAVER_MAP_CLIENT_ID") ?: ""
