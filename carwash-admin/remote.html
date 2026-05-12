@@ -11,6 +11,8 @@
     <meta name="format-detection" content="telephone=no" />
     <link rel="manifest" href="manifest.webmanifest" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
@@ -272,176 +274,107 @@
 
     <script>
       (function () {
-        var toastTimer = null;
+        const supabaseClient = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
-        function formatTime(d) {
-          try {
-            return (
-              d.getFullYear() +
-              '.' +
-              String(d.getMonth() + 1).padStart(2, '0') +
-              '.' +
-              String(d.getDate()).padStart(2, '0') +
-              ' ' +
-              String(d.getHours()).padStart(2, '0') +
-              ':' +
-              String(d.getMinutes()).padStart(2, '0') +
-              ':' +
-              String(d.getSeconds()).padStart(2, '0')
-            );
-          } catch (e) {
-            return '—';
+        const storeSelect = document.getElementById('store-select');
+        const lastSavedEl = document.getElementById('last-saved');
+        const announcementInput = document.getElementById('announcement');
+        const saveAnnouncementBtn = document.getElementById('save-announcement');
+
+        async function initRemote() {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          if (!session) { window.location.href = 'index.html'; return; }
+
+          const { data: shops } = await supabaseClient
+            .from('shops')
+            .select('id, name')
+            .eq('owner_id', session.user.id);
+
+          if (shops && shops.length > 0) {
+            storeSelect.innerHTML = shops.map(shop => 
+              `<option value="${shop.id}">${shop.name}</option>`
+            ).join('');
+            loadShopData(shops[0].id);
           }
         }
 
-        function getSelectedValue(name) {
-          var el = document.querySelector('input[name=\"' + name + '\"]:checked');
-          return el ? el.value : null;
+        async function loadShopData(shopId) {
+          const { data: shop } = await supabaseClient.from('shops').select('*').eq('id', shopId).single();
+          if (shop) {
+            // 영업 상태 반영
+            const statusVal = (shop.op_status === '영업중') ? 'open' : 'closed';
+            const stNode = document.querySelector(`input[name="status"][value="${statusVal}"]`);
+            if (stNode) stNode.checked = true;
+
+            // 겨울철 모드 반영
+            const winterVal = shop.has_hot_water ? 'hot' : 'frozen';
+            const wtNode = document.querySelector(`input[name="winter"][value="${winterVal}"]`);
+            if (wtNode) wtNode.checked = true;
+
+            // 혼잡도 반영
+            if (shop.congestion) {
+              const trNode = document.querySelector(`input[name="traffic"][value="${shop.congestion}"]`);
+              if (trNode) trNode.checked = true;
+            }
+
+            // [핵심] 공지사항 불러오기
+            if (announcementInput) {
+              announcementInput.value = shop.announcement || '';
+            }
+            updateLastSaved();
+          }
         }
 
-        function buildPayload() {
-          var storeSelect = document.getElementById('store-select');
-          var storeId = storeSelect && storeSelect.value ? storeSelect.value : 'store_gangnam';
-          var announcement = document.getElementById('announcement');
-          var payload = {
-            storeId: storeId,
-            status: getSelectedValue('status'), // open | closed
-            winterMode: getSelectedValue('winter'), // hot | frozen
-            congestion: getSelectedValue('traffic'), // clear | normal | busy
-            announcement: announcement ? announcement.value.trim() : '',
-            updatedAt: new Date().toISOString(),
+        async function updateShopStatus(column, value) {
+          const shopId = storeSelect.value;
+          if (!shopId) return;
+          
+          const updateData = {};
+          if (column === 'status') updateData.op_status = (value === 'open') ? '영업중' : '영업종료';
+          else if (column === 'winter') updateData.has_hot_water = (value === 'hot');
+          else if (column === 'traffic') updateData.congestion = value;
+          else if (column === 'announcement') updateData.announcement = value;
+
+          const { error } = await supabaseClient.from('shops').update(updateData).eq('id', shopId);
+
+          if (!error) {
+            showToast({ title: '저장됨', subtitle: '변경 사항이 반영되었습니다.' });
+            updateLastSaved();
+          } else {
+            console.error("저장 에러:", error);
+            showToast({ title: '오류', subtitle: '저장 실패', icon: 'error' });
+          }
+        }
+
+        // [이벤트 리스너 영역]
+        storeSelect.addEventListener('change', (e) => loadShopData(e.target.value));
+
+        ['status', 'winter', 'traffic'].forEach(name => {
+          document.querySelectorAll(`input[name="${name}"]`).forEach(el => {
+            el.addEventListener('change', (e) => updateShopStatus(name, e.target.value));
+          });
+        });
+
+        // [핵심] 공지사항 저장 버튼 리스너
+        if (saveAnnouncementBtn) {
+          saveAnnouncementBtn.onclick = function() {
+            const text = announcementInput.value.trim();
+            updateShopStatus('announcement', text);
           };
-          return payload;
         }
 
-        function renderPayload(payload) {
-          var pre = document.getElementById('payload-preview');
-          if (!pre) return;
-          pre.textContent = JSON.stringify(payload, null, 2);
-        }
+        function updateLastSaved() { if (lastSavedEl) lastSavedEl.textContent = new Date().toLocaleTimeString(); }
 
         function showToast(opts) {
-          var toast = document.getElementById('toast');
-          if (!toast) return;
-          var title = document.getElementById('toast-title');
-          var sub = document.getElementById('toast-subtitle');
-          var icon = document.getElementById('toast-icon');
-
-          if (title) title.textContent = (opts && opts.title) || '저장됨';
-          if (sub) sub.textContent = (opts && opts.subtitle) || '변경 사항이 반영되었습니다.';
-          if (icon) icon.textContent = (opts && opts.icon) || 'check_circle';
-
-          toast.classList.remove('toast-hidden');
-          toast.classList.add('toast-visible');
-          if (toastTimer) clearTimeout(toastTimer);
-          toastTimer = setTimeout(function () {
-            toast.classList.remove('toast-visible');
-            toast.classList.add('toast-hidden');
-          }, 1400);
+          const toast = document.getElementById('toast');
+          document.getElementById('toast-title').textContent = opts.title;
+          document.getElementById('toast-subtitle').textContent = opts.subtitle;
+          if (opts.icon) document.getElementById('toast-icon').textContent = opts.icon;
+          toast.classList.replace('toast-hidden', 'toast-visible');
+          setTimeout(() => toast.classList.replace('toast-visible', 'toast-hidden'), 1500);
         }
 
-        // ---- Mock API layer (replace with real fetch later) ----
-        function mockPatchStoreSettings(payload) {
-          // 실제 연동 형태 예시:
-          // return fetch(`/api/admin/stores/${payload.storeId}/settings`, {
-          //   method: 'PATCH',
-          //   headers: { 'Content-Type': 'application/json', Authorization: 'Bearer <token>' },
-          //   body: JSON.stringify(payload),
-          // });
-          return new Promise(function (resolve) {
-            setTimeout(function () {
-              resolve({ ok: true });
-            }, 220);
-          });
-        }
-
-        function save(reason) {
-          var payload = buildPayload();
-          renderPayload(payload);
-
-          return mockPatchStoreSettings(payload)
-            .then(function (res) {
-              if (!res || !res.ok) throw new Error('save failed');
-              var now = new Date();
-              var last = document.getElementById('last-saved');
-              if (last) last.textContent = formatTime(now);
-              showToast({
-                title: '저장됨',
-                subtitle: reason || '변경 사항이 반영되었습니다.',
-                icon: 'check_circle',
-              });
-            })
-            .catch(function () {
-              showToast({
-                title: '저장 실패',
-                subtitle: '네트워크 오류(목업). 다시 시도해 주세요.',
-                icon: 'error',
-              });
-            });
-        }
-
-        function init() {
-          // 최초 렌더
-          renderPayload(buildPayload());
-
-          // 라디오/셀렉트 변경 시 즉시 저장(운영툴 느낌)
-          ['status', 'winter', 'traffic'].forEach(function (name) {
-            document.querySelectorAll('input[name=\"' + name + '\"]').forEach(function (el) {
-              el.addEventListener('change', function () {
-                save('토글 변경 저장');
-              });
-            });
-          });
-
-          var store = document.getElementById('store-select');
-          if (store) {
-            store.addEventListener('change', function () {
-              renderPayload(buildPayload());
-              showToast({ title: '지점 변경', subtitle: '선택한 지점 기준으로 제어합니다.', icon: 'storefront' });
-            });
-          }
-
-          // 공지 저장 버튼
-          var btn = document.getElementById('save-announcement');
-          var input = document.getElementById('announcement');
-          if (btn && input) {
-            btn.addEventListener('click', function () {
-              var v = input.value.trim();
-              if (!v) {
-                showToast({ title: '안내', subtitle: '공지 내용을 입력해 주세요.', icon: 'info' });
-                return;
-              }
-              save('공지 저장');
-            });
-          }
-
-          // payload 복사
-          var copyBtn = document.getElementById('copy-payload');
-          if (copyBtn) {
-            copyBtn.addEventListener('click', function () {
-              var text = JSON.stringify(buildPayload(), null, 2);
-              if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard
-                  .writeText(text)
-                  .then(function () {
-                    showToast({ title: '복사됨', subtitle: 'payload가 클립보드에 복사되었습니다.', icon: 'content_copy' });
-                  })
-                  .catch(function () {
-                    showToast({ title: '복사 실패', subtitle: '브라우저 권한을 확인해 주세요.', icon: 'error' });
-                  });
-              } else {
-                showToast({ title: '복사 불가', subtitle: '이 브라우저는 클립보드를 지원하지 않습니다.', icon: 'warning' });
-              }
-            });
-          }
-        }
-
-        init();
-
-        // PWA용 서비스 워커 (https 환경에서 효과적)
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.register('./sw.js').catch(function () {});
-        }
+        initRemote();
       })();
     </script>
   </body>

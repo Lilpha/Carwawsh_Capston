@@ -11,6 +11,8 @@
     <meta name="format-detection" content="telephone=no" />
     <link rel="manifest" href="manifest.webmanifest" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
@@ -124,30 +126,84 @@
 
     <script>
       (function () {
-        var pin = document.getElementById('pin');
-        var btn = document.getElementById('toggle-pin');
-        var icon = document.getElementById('toggle-pin-icon');
-        if (!pin || !btn || !icon) return;
-        btn.addEventListener('click', function () {
-          var show = pin.type === 'password';
-          pin.type = show ? 'text' : 'password';
-          icon.textContent = show ? 'visibility_off' : 'visibility';
-        });
+        /**
+         * 1. Supabase 클라이언트 초기화
+         * 프로젝트 고유 URL과 공개 키(Anon Key)를 사용하여 DB와 연결할 엔진을 생성합니다.
+         */
+        console.log("CONFIG 로드 확인:", typeof CONFIG !== 'undefined' ? "성공" : "실패");
+        console.log("URL:", CONFIG.SUPABASE_URL);
+        const supabaseClient = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+        
+        // HTML 요소 선택 (ID 기반)
+        const pinInput = document.getElementById('pin');           // PIN 입력창
+        const toggleBtn = document.getElementById('toggle-pin');    // 비밀번호 표시/숨김 버튼
+        const icon = document.getElementById('toggle-pin-icon');    // 눈 모양 아이콘
 
-        var form = document.getElementById('login-form');
-        if (form) {
-          form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            var uid = document.getElementById('user-id');
-            var v = uid && uid.value.trim ? uid.value.trim() : '';
-            var q = v ? '?user=' + encodeURIComponent(v) : '';
-            window.location.href = 'dashboard.html' + q;
+        /**
+         * 2. PIN 번호 표시/숨김 토글 로직
+         * 눈 모양 아이콘을 클릭하면 input 타입을 password <-> text로 전환합니다.
+         */
+        if (toggleBtn && pinInput && icon) {
+          toggleBtn.addEventListener('click', function () {
+            const isPassword = pinInput.type === 'password';
+            // 타입 변경을 통해 텍스트 노출 여부 결정
+            pinInput.type = isPassword ? 'text' : 'password';
+            // Material Symbol 아이콘 변경 (visibility <-> visibility_off)
+            icon.textContent = isPassword ? 'visibility_off' : 'visibility';
           });
         }
 
-        // PWA용 서비스 워커 (https 환경에서 효과적)
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.register('./sw.js').catch(function () {});
+        /**
+         * 3. 로그인 폼 제출 처리
+         * 폼이 제출될 때 Supabase Auth를 통해 실제 사장님 계정인지 확인합니다.
+         */
+        const form = document.getElementById('login-form');
+        if (form) {
+          form.addEventListener('submit', async function (e) {
+            e.preventDefault(); // 폼 제출 시 페이지가 새로고침되는 것을 방지
+            
+            // 입력값 가져오기 (양 끝 공백 제거)
+            const email = document.getElementById('user-id').value.trim();
+            const password = pinInput.value;
+
+            // 로그인 버튼 상태 제어 (UX 개선)
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+
+            // 버튼 비활성화 및 로딩 애니메이션 추가 (중복 클릭 방지)
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span>인증 중...</span><span class="material-symbols-outlined animate-spin">sync</span>';
+
+            try {
+              /**
+               * Supabase 실제 인증 호출
+               * 사장님의 이메일과 비밀번호(PIN)를 서버로 전송하여 세션을 생성합니다.
+               */
+              const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: email,
+                password: password,
+              });
+
+              // 서버에서 에러를 반환한 경우 catch 블록으로 던짐
+              if (error) throw error;
+
+              /**
+               * 4. 인증 성공
+               * 세션이 성공적으로 생성되면 사장님 전용 대시보드로 페이지를 이동시킵니다.
+               */
+              console.log('로그인 성공 유저:', data.user.email);
+              window.location.href = 'dashboard.html';
+
+            } catch (error) {
+              /**
+               * 5. 인증 실패 또는 네트워크 에러 처리
+               * 사용자에게 에러 원인을 알리고, 버튼을 다시 활성화 상태로 되돌립니다.
+               */
+              alert('로그인 실패: ' + error.message);
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = originalText;
+            }
+          });
         }
       })();
     </script>
