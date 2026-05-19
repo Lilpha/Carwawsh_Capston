@@ -1,4 +1,6 @@
-﻿import React from 'react';
+﻿//네비게이터가 3개로 줄어들면서 사용하지 않는 화면입니다.
+
+import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 export default function HistoryScreen() {
