@@ -88,7 +88,7 @@ android {
         manifestPlaceholders = [
             NAVER_MAP_NCP_KEY_ID: project.findProperty("NAVER_MAP_NCP_KEY_ID") ?: "",
             NAVER_MAP_CLIENT_ID: project.findProperty("NAVER_MAP_CLIENT_ID") ?: ""
-        ]
+     ]
     }
     signingConfigs {
         debug {

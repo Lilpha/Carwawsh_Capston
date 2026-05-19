@@ -12,6 +12,7 @@ import {
   Platform,
   Animated,
 } from 'react-native';
+import { NaverMapView, NaverMapMarkerOverlay } from '@mj-studio/react-native-naver-map';
 import { supabase } from '../lib/supabase';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
@@ -23,9 +24,6 @@ import {
   MAP_FACILITY_FILTER_OPTIONS,
   type MapFacilityFilterKey,
 } from '../lib/map-facility-filters';
-
-// 1. 상단 INITIAL_COORD를 춘천(한림대)으로 통일
-const INITIAL_COORD = { latitude: 37.8865, longitude: 127.7385 };
 
 const colors = {
   primary: '#5a58e9',
@@ -127,27 +125,34 @@ const HomeScreen = () => {
   //   }, [registerGoToLogin, navigation]),
   // );
 
+  const getMarkerLimitByZoom = (zoom?: number) => {
+    if (typeof zoom !== 'number') return currentLimit;
+    if (zoom >= 16) return 5;
+    if (zoom >= 14) return 15;
+    if (zoom >= 12) return 30;
+    return 50;
+  };
+
   // 주변 세차장 데이터를 가져오는 함수 (PostGIS 연동)
-  const fetchNearbyWashes = async () => {
+  const fetchNearbyWashes = async (lat: number, lng: number, searchLimit: number) => {
     const isHotWater = selectedFacilityFilters.has('hotwater');
     const isIndoor = selectedFacilityFilters.has('indoor');
 
     console.log('--- [서버 요청 데이터 패키지] ---');
     console.log({
-      위도: currentRegion.latitude,
-      경도: currentRegion.longitude,
-      개수제한: currentLimit,
+      위도: lat,
+      경도: lng,
+      개수제한: searchLimit,
       온수필터: isHotWater,
       실내필터: isIndoor
     });
 
     try {
       const { data, error } = await supabase.rpc('get_nearby_washes', {
-        user_lat: currentRegion.latitude,
-        user_lng: currentRegion.longitude,
-        search_limit: currentLimit,
-        is_hotwater: isHotWater,
-        is_indoor: isIndoor
+        user_lat: lat,
+        user_lng: lng,
+        search_limit:15  
+//        search_limit: searchLimit,
       });
       if (error) throw error;
       if (data) {
@@ -158,49 +163,11 @@ const HomeScreen = () => {
             longitude: Number(w.longitude),
           })),
         );
+        console.log(data);
       }
     } catch (e: any) {
       console.error('검색 실패:', e.message);
     }
-  };
-
-  // 2. useEffect에서 전체 로드 대신 '주변 로드' 호출
-  useEffect(() => {
-    // 1. 화면 전환 시 무조건 입력창 비우기
-    setEmail('');
-    setPassword('');
-    setCarNumber('');
-    setCarType('승용');
-    setLoading(false);
-
-    // 2. 만약 지도로 넘어온 경우라면 세차장 데이터 로드
-    if (currentScreen === 'MAP') {
-      fetchNearbyWashes(INITIAL_COORD.latitude, INITIAL_COORD.longitude);
-    }
-  }, [currentScreen]);
-
-  // --- 1. 로그인 로직 ---
-  const handleLogin = async () => {
-    if (!email || !password) return Alert.alert('알림', '정보를 입력해주세요.');
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
-      if (error) {
-        console.error("로그인 상세 에러:", error.message); // 터미널에서 확인용
-        throw error;
-      }
-      
-      // 로그인 성공 시 지도로 이동
-      await loadWashes();
-      await fetchNearbyWashes(INITIAL_COORD.latitude, INITIAL_COORD.longitude);
-      setCurrentScreen('MAP');
-    } catch (e: any) {
-      Alert.alert('로그인 실패', e.message);
-    } finally { setLoading(false); }
   };
 
   const topOverlayContent = (
@@ -254,34 +221,7 @@ const HomeScreen = () => {
     </>
   );
 
-  // 주변 세차장 데이터를 가져오는 함수
-  const fetchNearbyWashes = async (lat: number, lng: number) => {
-    try {
-      const { data, error } = await supabase.rpc('get_nearby_washes', {
-        user_lat: lat,
-        user_lng: lng
-      });
-      if (error) throw error;
-      if (data) {
-        setWashes(data.map((w: any) => ({
-          ...w,
-          latitude: Number(w.latitude),
-          longitude: Number(w.longitude),
-        })));
-      }
-    } catch (e: any) {
-      console.error('검색 실패:', e.message);
-    }
-  };
-
   // --- 화면 분기 렌더링 ---
-
-          if (zoom >= 16) markerLimit = 5;
-          else if (zoom >= 14) markerLimit = 15;
-          else if (zoom >= 12) markerLimit = 30;
-          else markerLimit = 50;
-
-          // console.log(`[지도 조작] 줌: ${zoom.toFixed(1)} -> 결정된 마커 제한: ${markerLimit}개`);
 
   // [C] 지도 화면 (Step 3 결과물)
   return (
@@ -294,7 +234,10 @@ const HomeScreen = () => {
           zoom: 15 
         }}
         onCameraChanged={(e) => {
-          fetchNearbyWashes(e.latitude, e.longitude);
+          const markerLimit = getMarkerLimitByZoom(e.zoom);
+          setCurrentLimit(markerLimit);
+          setCurrentRegion({ latitude: e.latitude, longitude: e.longitude });
+          fetchNearbyWashes(e.latitude, e.longitude, markerLimit);
         }}
       >
         {/* 마커들은 그대로 둡니다 */}
@@ -308,6 +251,7 @@ const HomeScreen = () => {
             onTap={() => Alert.alert(wash.name, `${wash.address}\n상태: ${wash.status}`)}
           />
         ))}
+
       </NaverMapView>
 
       <Animated.View
@@ -351,6 +295,7 @@ const HomeScreen = () => {
 
 const styles = StyleSheet.create({
   mapContainer: { flex: 1 },
+  map: { flex: 1 },
   topOverlayWrap: {
     position: 'absolute',
     left: 0,
