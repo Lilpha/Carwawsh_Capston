@@ -85,10 +85,22 @@ android {
         versionCode 1
         versionName "1.0"
         
+        ndk {
+            abiFilters "arm64-v8a", "x86_64" // 새 arm64 표준 기기와 호환되도록 지정
+        }
+
+        // 안드로이드 스튜디오가 무조건 8085 포트와 맥북 M칩 규격을 쓰도록 파일에 박아버립니다.
+        project.ext.set("reactNativeDevServerPort", "8085")
+        project.ext.set("reactNativeArchitectures", "arm64-v8a")
+
+        // manifestPlaceholders = [
+        //     NAVER_MAP_NCP_KEY_ID: project.findProperty("NAVER_MAP_NCP_KEY_ID") ?: "",
+        //     NAVER_MAP_CLIENT_ID: project.findProperty("NAVER_MAP_CLIENT_ID") ?: ""
+        // ]
         manifestPlaceholders = [
-            NAVER_MAP_NCP_KEY_ID: project.findProperty("NAVER_MAP_NCP_KEY_ID") ?: "",
-            NAVER_MAP_CLIENT_ID: project.findProperty("NAVER_MAP_CLIENT_ID") ?: ""
-     ]
+            NAVER_MAP_NCP_KEY_ID: "dnehqru9x2",
+            NAVER_MAP_CLIENT_ID: "dnehqru9x2"
+        ]
     }
     signingConfigs {
         debug {
