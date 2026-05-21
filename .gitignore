@@ -12,3 +12,4 @@ frontend/vendor/
 # Sensitive files
 .env
 google-services.json
+carwash-admin/config.js
