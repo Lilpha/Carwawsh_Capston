@@ -2,28 +2,46 @@
 import {
   SafeAreaView,
   StyleSheet,
-  TouchableOpacity,
   Text,
   View,
   Alert,
-  ActivityIndicator,
   ScrollView,
   Pressable,
   Platform,
   Animated,
 } from 'react-native';
-import { NaverMapView, NaverMapMarkerOverlay } from '@mj-studio/react-native-naver-map';
 import { supabase } from '../lib/supabase';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import {
+  CompositeNavigationProp,
+  RouteProp,
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/types';
-import { useLoginRedirect } from '../navigation/LoginRedirectContext';
+import type { MainTabParamList, RootStackParamList } from '../navigation/types';
+import { filterNearestPoints } from '../lib/filter-map-points';
+import {
+  DEFAULT_NEARBY_WASH_LIMIT,
+  DEMO_MAP_ZOOM,
+  INITIAL_MAP_COORD,
+  MAP_EV_MARKER_LIMIT,
+  MAP_GAS_MARKER_LIMIT,
+  MAP_POI_RADIUS_KM,
+} from '../lib/map-constants';
+import MapScreen, { type MapScreenHandle, type MapWashMarker } from './MapScreen';
 import {
   MAP_FACILITY_FILTER_OPTIONS,
   type MapFacilityFilterKey,
 } from '../lib/map-facility-filters';
+import RoutePlannerCard from '../components/RoutePlannerCard';
+import { dedupeEvByBuilding } from '../lib/ev-dedupe';
+import { fetchEvChargers, type EvMapPoint } from '../lib/ev';
+import { fetchOpinetStations, type GasMapPoint } from '../lib/opinet';
+import { useRoutePlan } from '../navigation/RoutePlanContext';
 
 const colors = {
   primary: '#5a58e9',
@@ -36,8 +54,7 @@ const colors = {
   mapFallback: '#E2E8F0',
 };
 
-// 1. 상단 INITIAL_COORD를 춘천(한림대)으로 통일
-const INITIAL_COORD = { latitude: 37.8865, longitude: 127.7385 };
+const INITIAL_COORD = INITIAL_MAP_COORD;
 
 type Wash = {
   id: number;
@@ -63,6 +80,14 @@ function isTruthyFacilityFlag(value: unknown): boolean {
 
 type WashRow = Wash & Record<string, unknown>;
 
+/** 세차장 필터용 (hotwater·indoor만). 'ev'는 EV API 마커 표시 토글로 별도 처리 */
+function washOnlyFacilityFilters(filters: Set<MapFacilityFilterKey>): Set<MapFacilityFilterKey> {
+  const washFilters = new Set<MapFacilityFilterKey>();
+  if (filters.has('hotwater')) washFilters.add('hotwater');
+  if (filters.has('indoor')) washFilters.add('indoor');
+  return washFilters;
+}
+
 function washMatchesFacilityFilters(
   wash: WashRow,
   filters: Set<MapFacilityFilterKey>,
@@ -72,30 +97,35 @@ function washMatchesFacilityFilters(
   const indoor =
     isTruthyFacilityFlag(wash.hasIndoorBay) ||
     isTruthyFacilityFlag(wash.has_indoor_bay);
-  const ev =
-    isTruthyFacilityFlag(wash.hasEvCharging) ||
-    isTruthyFacilityFlag(wash.has_ev_charging);
   if (filters.has('hotwater') && !hot) return false;
   if (filters.has('indoor') && !indoor) return false;
-  if (filters.has('ev') && !ev) return false;
   return true;
 }
 
-const HomeScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  // const { registerGoToLogin } = useLoginRedirect();
+type MapTabRoute = RouteProp<MainTabParamList, 'Map'>;
+type HomeScreenNavigation = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Map'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
-  const [loading, setLoading] = useState(false);
+const HomeScreen = () => {
+  const navigation = useNavigation<HomeScreenNavigation>();
+  const route = useRoute<MapTabRoute>();
+  const { setForceCollapsed, openRouteSearchEntry } = useRoutePlan();
+
   const [washes, setWashes] = useState<Wash[]>([]);
+  const [openWashIdFromList, setOpenWashIdFromList] = useState<number | null>(null);
+  const [gasStations, setGasStations] = useState<GasMapPoint[]>([]);
+  const [evChargers, setEvChargers] = useState<EvMapPoint[]>([]);
   const [selectedFacilityFilters, setSelectedFacilityFilters] = useState<
     Set<MapFacilityFilterKey>
   >(() => new Set());
-  
-  // 현재 줌과 좌표를 저장해둘 상태 (필터 변경 시 재사용)
-  const [currentLimit, setCurrentLimit] = useState(10);
-  const [currentRegion, setCurrentRegion] = useState(INITIAL_COORD);
+
+  const [currentLimit, setCurrentLimit] = useState(DEFAULT_NEARBY_WASH_LIMIT);
+  const [mapCenter, setMapCenter] = useState(INITIAL_COORD);
 
   const [mapSheetIndex, setMapSheetIndex] = useState(-1);
+  const mapScreenRef = useRef<MapScreenHandle>(null);
   const bottomBarOpacity = useRef(new Animated.Value(1)).current;
   const topSearchOpacity = useRef(new Animated.Value(1)).current;
 
@@ -115,15 +145,28 @@ const HomeScreen = () => {
     }).start();
   }, [mapSheetIndex, topSearchOpacity]);
 
-  // useFocusEffect(
-  //   useCallback(() => {
-  //     registerGoToLogin(() => {
-  //       // setCurrentScreen('LOGIN');
-  //       // 글로벌 스택에 있는 Login 화면으로 리다이렉트
-  //       navigation.navigate('Login');
-  //     });
-  //   }, [registerGoToLogin, navigation]),
-  // );
+  useEffect(() => {
+    setForceCollapsed(mapSheetIndex >= 0);
+  }, [mapSheetIndex, setForceCollapsed]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const id = route.params?.openWashId;
+      if (id == null || !Number.isFinite(id)) return;
+      setOpenWashIdFromList(id);
+      navigation.setParams({ openWashId: undefined });
+    }, [route.params?.openWashId, navigation]),
+  );
+
+  const allWashMarkers = useMemo(
+    (): MapWashMarker[] =>
+      washes.map((w) => ({
+        ...w,
+        latitude: Number(w.latitude),
+        longitude: Number(w.longitude),
+      })),
+    [washes],
+  );
 
   const getMarkerLimitByZoom = (zoom?: number) => {
     if (typeof zoom !== 'number') return currentLimit;
@@ -133,56 +176,148 @@ const HomeScreen = () => {
     return 50;
   };
 
-  // 주변 세차장 데이터를 가져오는 함수 (PostGIS 연동)
-  const fetchNearbyWashes = async (lat: number, lng: number, searchLimit: number) => {
-    const isHotWater = selectedFacilityFilters.has('hotwater');
-    const isIndoor = selectedFacilityFilters.has('indoor');
-
-    console.log('--- [서버 요청 데이터 패키지] ---');
-    console.log({
-      위도: lat,
-      경도: lng,
-      개수제한: searchLimit,
-      온수필터: isHotWater,
-      실내필터: isIndoor
-    });
-
-    try {
-      const { data, error } = await supabase.rpc('get_nearby_washes', {
-        user_lat: lat,
-        user_lng: lng,
-        search_limit:15  
-//        search_limit: searchLimit,
-      });
-      if (error) throw error;
-      if (data) {
-        setWashes(
-          data.map((w: any) => ({
+  const fetchNearbyWashes = useCallback(
+    async (lat: number, lng: number, searchLimit: number) => {
+      try {
+        const { data, error } = await supabase.rpc('get_nearby_washes', {
+          user_lat: lat,
+          user_lng: lng,
+          search_limit: searchLimit,
+        });
+        if (error) {
+          console.log('[MapDebug] get_nearby_washes error:', error.message ?? error);
+          throw error;
+        }
+        if (data) {
+          const rows = data.map((w: WashRow) => ({
             ...w,
             latitude: Number(w.latitude),
             longitude: Number(w.longitude),
-          })),
-        );
-        console.log(data);
+          }));
+          console.log('[MapDebug] get_nearby_washes ok:', {
+            count: rows.length,
+            lat,
+            lng,
+            searchLimit,
+          });
+          setWashes(rows);
+        } else {
+          console.log('[MapDebug] get_nearby_washes ok: data=null/undefined', {
+            lat,
+            lng,
+            searchLimit,
+          });
+        }
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
+        console.error('검색 실패:', message);
+        console.log('[MapDebug] get_nearby_washes failed:', message);
       }
-    } catch (e: any) {
-      console.error('검색 실패:', e.message);
-    }
-  };
+    },
+    [],
+  );
+
+  useEffect(() => {
+    fetchNearbyWashes(INITIAL_COORD.latitude, INITIAL_COORD.longitude, currentLimit);
+  }, [fetchNearbyWashes, currentLimit]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [gasResult, evResult] = await Promise.allSettled([
+        fetchOpinetStations(),
+        fetchEvChargers(),
+      ]);
+      if (cancelled) return;
+      if (gasResult.status === 'fulfilled') setGasStations(gasResult.value);
+      else console.error('Opinet 로드 실패:', gasResult.reason);
+      if (evResult.status === 'fulfilled') setEvChargers(evResult.value);
+      else console.error('EV 로드 실패:', evResult.reason);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleCameraIdle = useCallback(
+    (e: { latitude: number; longitude: number; zoom?: number }) => {
+      setMapCenter({ latitude: e.latitude, longitude: e.longitude });
+      const markerLimit = getMarkerLimitByZoom(e.zoom);
+      setCurrentLimit(markerLimit);
+      fetchNearbyWashes(e.latitude, e.longitude, markerLimit);
+    },
+    [fetchNearbyWashes],
+  );
+
+  /** 데모용 My Location: GPS 없이 기본 중심으로 지도 이동 + 주변 세차장 갱신 */
+  const handleMyLocationPress = useCallback(() => {
+    mapScreenRef.current?.goToDemoLocation();
+    const limit = getMarkerLimitByZoom(DEMO_MAP_ZOOM);
+    setCurrentLimit(limit);
+    fetchNearbyWashes(INITIAL_COORD.latitude, INITIAL_COORD.longitude, limit);
+  }, [fetchNearbyWashes]);
+
+  const visibleWashes = useMemo(() => {
+    const washFilters = washOnlyFacilityFilters(selectedFacilityFilters);
+    if (washFilters.size === 0) return washes;
+    return washes.filter((wash) =>
+      washMatchesFacilityFilters(wash as WashRow, washFilters),
+    );
+  }, [washes, selectedFacilityFilters]);
+
+  const visibleGasStations = useMemo(
+    () =>
+      filterNearestPoints(
+        gasStations,
+        mapCenter,
+        MAP_POI_RADIUS_KM,
+        MAP_GAS_MARKER_LIMIT,
+      ),
+    [gasStations, mapCenter],
+  );
+
+  const showEvMapMarkers = selectedFacilityFilters.has('ev');
+
+  const visibleEvChargers = useMemo(() => {
+    if (!showEvMapMarkers) return [];
+    return filterNearestPoints(
+      dedupeEvByBuilding(evChargers),
+      mapCenter,
+      MAP_POI_RADIUS_KM,
+      MAP_EV_MARKER_LIMIT,
+    );
+  }, [evChargers, mapCenter, showEvMapMarkers]);
+
+  useEffect(() => {
+    const washFilters = washOnlyFacilityFilters(selectedFacilityFilters);
+    console.log('[MapDebug] map state:', {
+      washesLength: washes.length,
+      visibleWashesLength: visibleWashes.length,
+      selectedFacilityFilters: Array.from(selectedFacilityFilters),
+      washOnlyFilters: Array.from(washFilters),
+      mapCenter,
+    });
+  }, [washes.length, visibleWashes.length, selectedFacilityFilters, mapCenter]);
 
   const topOverlayContent = (
-    <>
+    <View pointerEvents="box-none">
       <View style={styles.searchOuter} pointerEvents="box-none">
         <Pressable
-          onPress={() => navigation.getParent()?.navigate('Search')}
+          onPress={openRouteSearchEntry}
           style={[
             styles.search,
             { backgroundColor: colors.panel, borderColor: colors.panelBorder, shadowColor: '#000' },
           ]}
+          accessibilityRole="button"
+          accessibilityLabel="출발·목적지 검색, 내비게이션 길찾기 열기"
         >
           <MaterialIcons name="search" size={22} color={colors.primary} style={styles.searchIcon} />
-          <Text style={[styles.searchPlaceholder, { color: colors.muted }]}>세차장 이름·지역 검색</Text>
+          <Text style={[styles.searchPlaceholder, { color: colors.muted }]}>출발·목적지 검색</Text>
         </Pressable>
+      </View>
+
+      <View pointerEvents="box-none">
+        <RoutePlannerCard forceCollapsed={mapSheetIndex >= 0} />
       </View>
 
       <ScrollView
@@ -190,6 +325,7 @@ const HomeScreen = () => {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filters}
         style={styles.filtersScroll}
+        pointerEvents="box-none"
       >
         {MAP_FACILITY_FILTER_OPTIONS.map((f) => {
           const active = selectedFacilityFilters.has(f.key);
@@ -218,45 +354,26 @@ const HomeScreen = () => {
           );
         })}
       </ScrollView>
-    </>
+    </View>
   );
 
-  // --- 화면 분기 렌더링 ---
-
-  // [C] 지도 화면 (Step 3 결과물)
   return (
-    <View style={styles.mapContainer}>
-      <NaverMapView
-        style={styles.map}
-        initialCamera={{ 
-          latitude: INITIAL_COORD.latitude, 
-          longitude: INITIAL_COORD.longitude, 
-          zoom: 15 
-        }}
-        onCameraChanged={(e) => {
-          const markerLimit = getMarkerLimitByZoom(e.zoom);
-          setCurrentLimit(markerLimit);
-          setCurrentRegion({ latitude: e.latitude, longitude: e.longitude });
-          fetchNearbyWashes(e.latitude, e.longitude, markerLimit);
-        }}
-      >
-        {/* 마커들은 그대로 둡니다 */}
-        {washes.map((wash) => (
-          <NaverMapMarkerOverlay
-            key={`wash-${wash.id}`}
-            latitude={wash.latitude}
-            longitude={wash.longitude}
-            image={{ symbol: wash.status === '동파' ? 'red' : 'green' }}
-            caption={{ text: wash.name }}
-            onTap={() => Alert.alert(wash.name, `${wash.address}\n상태: ${wash.status}`)}
-          />
-        ))}
-
-      </NaverMapView>
+    <View style={styles.mapContainer} pointerEvents="box-none">
+      <MapScreen
+        ref={mapScreenRef}
+        visibleWashes={visibleWashes}
+        openWashId={openWashIdFromList}
+        allWashesForLookup={allWashMarkers}
+        onOpenWashConsumed={() => setOpenWashIdFromList(null)}
+        visibleGasStations={visibleGasStations}
+        visibleEvChargers={visibleEvChargers}
+        onSheetIndexChange={setMapSheetIndex}
+        onCameraIdle={handleCameraIdle}
+      />
 
       <Animated.View
         style={[styles.topOverlayWrap, { opacity: topSearchOpacity }]}
-        pointerEvents={mapSheetIndex === 1 ? 'none' : 'box-none'}
+        pointerEvents={mapSheetIndex >= 0 ? 'none' : 'box-none'}
       >
         <SafeAreaView style={styles.topOverlay} pointerEvents="box-none">
           {topOverlayContent}
@@ -280,8 +397,10 @@ const HomeScreen = () => {
               <Text style={[styles.ctaText, { color: colors.text }]}>List View</Text>
             </Pressable>
             <Pressable
-              onPress={() => Alert.alert('알림', 'my location 버튼 클릭됨.')}
+              onPress={handleMyLocationPress}
               style={[styles.cta, { backgroundColor: colors.primary, borderColor: 'transparent' }]}
+              accessibilityRole="button"
+              accessibilityLabel="데모 위치로 지도 이동 및 주변 세차장 갱신"
             >
               <MaterialIcons name="near-me" size={20} color="#fff" />
               <Text style={[styles.ctaText, { color: '#fff' }]}>My Location</Text>
@@ -295,7 +414,6 @@ const HomeScreen = () => {
 
 const styles = StyleSheet.create({
   mapContainer: { flex: 1 },
-  map: { flex: 1 },
   topOverlayWrap: {
     position: 'absolute',
     left: 0,

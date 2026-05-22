@@ -6,9 +6,11 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import TabNavigator from './src/navigation/TabNavigator';
 import { LoginRedirectProvider } from './src/navigation/LoginRedirectContext';
+import { RoutePlanProvider } from './src/navigation/RoutePlanContext';
 import { SavedShopsProvider } from './src/navigation/SavedShopsContext';
 import type { RootStackParamList } from './src/navigation/types';
 import SearchScreen from './src/screens/SearchScreen';
+import ListScreen from './src/screens/ListScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import SignupScreen from './src/screens/SignupScreen';
 
@@ -23,6 +25,7 @@ export default function App() {
         <NavigationContainer>
           <LoginRedirectProvider>
             <SavedShopsProvider>
+              <RoutePlanProvider>
               <Stack.Navigator initialRouteName="Login">
                 {/* 신규: 로그인 및 회원가입 인증 흐름 */}
                 <Stack.Screen 
@@ -46,7 +49,13 @@ export default function App() {
                   component={SearchScreen}
                   options={{ headerShown: false }}
                 />
+                <Stack.Screen
+                  name="List"
+                  component={ListScreen}
+                  options={{ headerShown: false }}
+                />
               </Stack.Navigator>
+              </RoutePlanProvider>
             </SavedShopsProvider>
           </LoginRedirectProvider>
         </NavigationContainer>

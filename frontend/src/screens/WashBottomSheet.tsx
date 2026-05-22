@@ -4,6 +4,8 @@ import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
+import { washToRoutePlace } from '../lib/route-plan';
+import { useRoutePlan } from '../navigation/RoutePlanContext';
 import { useSavedShops } from '../navigation/SavedShopsContext';
 
 /** -1 닫힘 · 0 절반 · 1 전체(지도 덮음) */
@@ -82,6 +84,7 @@ const WashBottomSheet = forwardRef<BottomSheet, WashBottomSheetProps>(
   function WashBottomSheet({ index, onChange, wash, onClosePress }, ref) {
     const insets = useSafeAreaInsets();
     const { isShopSaved, saveShop, removeSavedByShopId } = useSavedShops();
+    const { assignPlace, startRouteGuidance } = useRoutePlan();
     const gesturesEnabled = index !== -1;
     /** 절반(0)일 때는 스크롤 끔 → 세로 드래그가 시트에 전달됨. 전체(1)만 스크롤 */
     const scrollEnabled = index === 1;
@@ -104,7 +107,24 @@ const WashBottomSheet = forwardRef<BottomSheet, WashBottomSheetProps>(
       }
     }, [wash, isShopSaved, saveShop, removeSavedByShopId]);
 
-    const onNavPress = () => Alert.alert('알림', '길 안내(목업)');
+    const washRoutePlace = (() => {
+      if (!wash) return null;
+      const lat = Number((wash as { latitude?: number }).latitude);
+      const lng = Number((wash as { longitude?: number }).longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return washToRoutePlace({
+        id: wash.id,
+        name: wash.name,
+        address: wash.address,
+        latitude: lat,
+        longitude: lng,
+      });
+    })();
+
+    const onNavPress = () => {
+      if (washRoutePlace) startRouteGuidance(washRoutePlace);
+      else Alert.alert('알림', '위치 정보가 없어 길 안내를 시작할 수 없습니다.');
+    };
 
     return (
       <BottomSheet
@@ -113,6 +133,7 @@ const WashBottomSheet = forwardRef<BottomSheet, WashBottomSheetProps>(
         snapPoints={[...SNAP_POINTS]}
         topInset={insets.top}
         bottomInset={insets.bottom}
+        containerStyle={index < 0 ? { pointerEvents: 'none' } : undefined}
         enablePanDownToClose
         enableHandlePanningGesture={gesturesEnabled}
         enableContentPanningGesture={gesturesEnabled}
@@ -195,12 +216,35 @@ const WashBottomSheet = forwardRef<BottomSheet, WashBottomSheetProps>(
             })}
           </View>
 
+          {washRoutePlace ? (
+            <View style={styles.routeSlotRow}>
+              <Pressable
+                style={[styles.routeSlotBtn, { borderColor: colors.panelBorder }]}
+                onPress={() => assignPlace('destination', washRoutePlace)}
+              >
+                <Text style={[styles.routeSlotBtnText, { color: colors.primary }]}>목적지</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.routeSlotBtn, { borderColor: colors.panelBorder }]}
+                onPress={() => assignPlace('waypoint', washRoutePlace)}
+              >
+                <Text style={[styles.routeSlotBtnText, { color: colors.primary }]}>경유지</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.routeSlotBtn, { borderColor: colors.panelBorder }]}
+                onPress={() => assignPlace('origin', washRoutePlace)}
+              >
+                <Text style={[styles.routeSlotBtnText, { color: colors.primary }]}>출발지</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           <Pressable
             style={[styles.navCta, styles.navCtaPeek, { backgroundColor: colors.primary }]}
             onPress={onNavPress}
           >
             <MaterialIcons name="navigation" size={20} color="#fff" />
-            <Text style={styles.navCtaText}>{SHEET_MOCK.navCta}</Text>
+            <Text style={styles.navCtaText}>길 안내</Text>
           </Pressable>
 
           <Text style={[styles.peekHint, { color: colors.tabMuted }]}>
@@ -254,7 +298,7 @@ const WashBottomSheet = forwardRef<BottomSheet, WashBottomSheetProps>(
             onPress={onNavPress}
           >
             <MaterialIcons name="navigation" size={20} color="#fff" />
-            <Text style={styles.navCtaText}>{SHEET_MOCK.navCta}</Text>
+            <Text style={styles.navCtaText}>길 안내</Text>
           </Pressable>
         </BottomSheetScrollView>
       </BottomSheet>
@@ -304,6 +348,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
+  routeSlotRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  routeSlotBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  routeSlotBtnText: { fontSize: 13, fontWeight: '800' },
   navCtaPeek: { marginBottom: 8 },
   navCtaFooter: { marginTop: 16, marginBottom: 8 },
   navCtaText: { color: '#fff', fontSize: 15, fontWeight: '800' },

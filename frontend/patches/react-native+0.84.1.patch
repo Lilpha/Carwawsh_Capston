@@ -1,0 +1,14 @@
+diff --git a/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/devsupport/BundleDownloader.kt b/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/devsupport/BundleDownloader.kt
+index c7b814a..20826ef 100644
+--- a/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/devsupport/BundleDownloader.kt
++++ b/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/devsupport/BundleDownloader.kt
+@@ -85,7 +85,8 @@ public class BundleDownloader public constructor(private val client: OkHttpClien
+       requestBuilder: Request.Builder = Request.Builder(),
+   ) {
+     checkNotNull(bundleURL)
+-    val request = requestBuilder.url(bundleURL).addHeader("Accept", "multipart/mixed").build()
++    // Plain JS response avoids MultipartStreamReader ProtocolException on large bundles (RN 0.84 / emulator).
++    val request = requestBuilder.url(bundleURL).addHeader("Accept", "application/javascript").build()
+     downloadBundleFromURLCall = client.newCall(request)
+     checkNotNull(downloadBundleFromURLCall)
+         .enqueue(
