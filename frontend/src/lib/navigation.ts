@@ -55,6 +55,7 @@ function buildWebFallbackUrl(plan: RoutePlan): string {
 }
 
 async function openUrl(url: string, appLabel: string, plan: RoutePlan) {
+  console.log(`Opening URL: ${url}`);
   try {
     const canOpen = await Linking.canOpenURL(url);
     if (canOpen) {
@@ -89,8 +90,10 @@ export async function openNaverRoute(plan: RoutePlan) {
     return;
   }
   const url =
-    Platform.OS === 'android' ? buildNaverAndroidIntentUrl(plan) : buildNaverRouteUrl(plan);
-  await openUrl(url, '네이버 지도', plan);
+//    Platform.OS === 'android' ? buildNaverAndroidIntentUrl(plan) : buildNaverRouteUrl(plan);
+  //"네이버지도 url테스트"+ buildNaverAndroidIntentUrl(plan) + "\n\n"+buildNaverRouteUrl(plan);
+buildNaverRouteUrl(plan)
+await openUrl(url, '네이버 지도', plan);
 }
 
 export async function openKakaoRoute(plan: RoutePlan) {

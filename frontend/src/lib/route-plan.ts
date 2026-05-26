@@ -29,14 +29,9 @@ export const EMPTY_ROUTE_PLAN: RoutePlan = {
   destination: null,
 };
 
-const KIND_PREFIX: Record<MapPointKind, string> = {
-  wash: '세차',
-  gas: '주유',
-  ev: '충전',
-};
 
 export function formatRoutePlaceLabel(place: RoutePlanPlace): string {
-  return `[${KIND_PREFIX[place.kind]}] ${place.name}`;
+  return `${place.name}`;
 }
 
 export function canNavigate(plan: RoutePlan): boolean {
