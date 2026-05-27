@@ -86,8 +86,8 @@ android {
         versionName "1.0"
         
         manifestPlaceholders = [
-            NAVER_MAP_NCP_KEY_ID: project.findProperty("NAVER_MAP_NCP_KEY_ID") ?: "",
-            NAVER_MAP_CLIENT_ID: project.findProperty("NAVER_MAP_CLIENT_ID") ?: "",
+            NAVER_MAP_NCP_KEY_ID: project.findProperty("NAVER_MAP_NCP_KEY_ID") ?: "dnehqru9x2",
+            NAVER_MAP_CLIENT_ID: project.findProperty("NAVER_MAP_CLIENT_ID") ?: "dnehqru9x2",
             usesCleartextTraffic: "true",
      ]
     }

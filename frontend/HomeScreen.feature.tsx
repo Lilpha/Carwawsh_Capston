@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -179,9 +179,6 @@ const HomeScreen = () => {
   const fetchNearbyWashes = useCallback(
     async (lat: number, lng: number, searchLimit: number) => {
       try {
-        const backupResult = await supabase.from('shops').select('*');
-        const allShops = backupResult.data ?? [];
-
         const { data, error } = await supabase.rpc('get_nearby_washes', {
           user_lat: lat,
           user_lng: lng,
@@ -189,44 +186,14 @@ const HomeScreen = () => {
         });
         if (error) {
           console.log('[MapDebug] get_nearby_washes error:', error.message ?? error);
+          throw error;
         }
-
-        const toWash = (w: WashRow): Wash => {
-          const hasHotWater =
-            isTruthyFacilityFlag(w.hasHeatedWater) || isTruthyFacilityFlag(w.has_hot_water);
-          const hasIndoorBay =
-            isTruthyFacilityFlag(w.hasIndoorBay) ||
-            isTruthyFacilityFlag(w.has_indoor_bay) ||
-            isTruthyFacilityFlag(w.is_indoor);
-          const hasEvCharging =
-            isTruthyFacilityFlag(w.hasEvCharging) || isTruthyFacilityFlag(w.has_ev_charging);
-
-          let status = '정상';
-          if (w.op_status === '영업종료') {
-            status = '영업종료';
-          } else if (!hasHotWater) {
-            status = '동파';
-          }
-
-          return {
+        if (data) {
+          const rows = data.map((w: WashRow) => ({
             ...w,
-            id: Number(w.id),
-            name: w.name,
-            address: w.address ?? '',
-            status,
-            latitude: Number(w.latitude ?? w.lat),
-            longitude: Number(w.longitude ?? w.lng),
-            hasHeatedWater: hasHotWater,
-            hasIndoorBay,
-            hasEvCharging,
-          };
-        };
-
-        const rpcRows = Array.isArray(data) ? data : [];
-        const hasRpcData = rpcRows.length > 0;
-
-        if (hasRpcData) {
-          const rows = rpcRows.map((w: WashRow) => toWash(w));
+            latitude: Number(w.latitude),
+            longitude: Number(w.longitude),
+          }));
           console.log('[MapDebug] get_nearby_washes ok:', {
             count: rows.length,
             lat,
@@ -234,33 +201,13 @@ const HomeScreen = () => {
             searchLimit,
           });
           setWashes(rows);
-          return;
-        }
-
-        if (allShops.length > 0) {
-          const fallbackRows = filterNearestPoints(
-            allShops.map((w: WashRow) => toWash(w)),
-            { latitude: lat, longitude: lng },
-            MAP_POI_RADIUS_KM,
-            searchLimit,
-          );
-
-          console.log('[MapDebug] using backup shops data:', {
+        } else {
+          console.log('[MapDebug] get_nearby_washes ok: data=null/undefined', {
             lat,
             lng,
             searchLimit,
-            backupLength: allShops.length,
-            filteredLength: fallbackRows.length,
           });
-          setWashes(fallbackRows);
-          return;
         }
-
-        console.log('[MapDebug] get_nearby_washes ok: data=null/undefined', {
-          lat,
-          lng,
-          searchLimit,
-        });
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : String(e);
         console.error('검색 실패:', message);

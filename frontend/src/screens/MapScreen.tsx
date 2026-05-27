@@ -286,7 +286,7 @@ const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(function MapScreen
             image={{ symbol: 'blue' }}
             anchor={{ x: 0.5, y: 1 }}
             isHideCollidedCaptions
-            caption={{ text: 'G' }}
+            caption={{ text: station.brandName ?? '주유소' }}
             onTap={() => onGasMarkerPress(station)}
           />
         ))}
@@ -306,7 +306,7 @@ const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(function MapScreen
             image={{ symbol: evMarkerSymbol(charger.statName) }}
             anchor={{ x: 0.5, y: 1 }}
             isHideCollidedCaptions
-            caption={{ text: 'EV' }}
+            caption={{ text: charger.name ?? '충전소' }}
             onTap={() => onEvMarkerPress(charger)}
           />
         ))}
@@ -327,7 +327,7 @@ const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(function MapScreen
             image={{ symbol: wash.status === '동파' ? 'red' : 'green' }}
             anchor={{ x: 0.5, y: 1 }}
             isHideCollidedCaptions
-            caption={{ text: 'W' }}
+            caption={{ text: wash.name }}
             onTap={() => onWashMarkerPress(wash)}
           />
         ))}
