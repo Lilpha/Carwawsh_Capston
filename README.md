@@ -90,40 +90,9 @@
 ### Admin Web
 * HTML5, Vanilla CSS, JavaScript, Service Worker (PWA 지원)
 
----
-
-## 📐 시스템 아키텍처 및 서버 구조
-
-```mermaid
-graph TD
-    %% Frontend Layer
-    RNApp[React Native App]
-    WebAdmin[Web Admin (업주 플랫폼)]
-
-    %% Backend Layer
-    NextServer[Node.js Express / Next.js Server]
-    Supa[Supabase Database]
-
-    %% External APIs
-    KakaoAPI[카카오 키워드 검색 API]
-    EnviroAPI[한국환경공단 EV 충전소 API]
-    OpinetAPI[Opinet 유가 API]
-
-    %% External Apps
-    NaviApps[외부 내비게이션 앱<br>네이버 지도 / 카카오맵 / TMAP]
-
-    %% Connections
-    RNApp <-->|가입 / 로그인 / 실시간 로딩| Supa
-    RNApp -->|키워드 검색 / 충전소 데이터 요청| NextServer
-    RNApp -->|URL Scheme 연동| NaviApps
-    
-    WebAdmin <-->|세차장 상태 수정 및 공지사항| Supa
-    NextServer <-->|키 노출 대비 이중화| KakaoAPI
-    NextServer -->|지역/시간 단위 동기화| EnviroAPI
-    NextServer -->|일 1회 동기화| OpinetAPI
-```
 
 ---
+
 
 ## 📁 프로젝트 폴더 구조 (Project Directory)
 
