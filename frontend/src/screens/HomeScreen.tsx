@@ -123,6 +123,8 @@ const HomeScreen = () => {
 
   const [currentLimit, setCurrentLimit] = useState(DEFAULT_NEARBY_WASH_LIMIT);
   const [mapCenter, setMapCenter] = useState(INITIAL_COORD);
+  const mapCenterRef = useRef(INITIAL_COORD);
+  const currentLimitRef = useRef(DEFAULT_NEARBY_WASH_LIMIT);
 
   const [mapSheetIndex, setMapSheetIndex] = useState(-1);
   const mapScreenRef = useRef<MapScreenHandle>(null);
@@ -148,6 +150,14 @@ const HomeScreen = () => {
   useEffect(() => {
     setForceCollapsed(mapSheetIndex >= 0);
   }, [mapSheetIndex, setForceCollapsed]);
+
+  useEffect(() => {
+    mapCenterRef.current = mapCenter;
+  }, [mapCenter]);
+
+  useEffect(() => {
+    currentLimitRef.current = currentLimit;
+  }, [currentLimit]);
 
   useFocusEffect(
     useCallback(() => {
@@ -268,6 +278,23 @@ const HomeScreen = () => {
       }
     },
     [],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const refreshWashes = () => {
+        const { latitude, longitude } = mapCenterRef.current;
+        const limit = currentLimitRef.current;
+        fetchNearbyWashes(latitude, longitude, limit);
+      };
+
+      refreshWashes();
+      const intervalId = setInterval(refreshWashes, 3_000);
+
+      return () => {
+        clearInterval(intervalId);
+      };
+    }, [fetchNearbyWashes]),
   );
 
   useEffect(() => {
